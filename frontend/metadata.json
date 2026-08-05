@@ -1,0 +1,6 @@
+{
+  "name": "DigiWise Cloud",
+  "description": "Enterprise-grade cloud infrastructure platform dashboard, domain management, VPS instance portal, and billing suite inspired by DigiWise Cloud.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

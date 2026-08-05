@@ -1,0 +1,38 @@
+{
+  "name": "digiwise-hosting-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.1",
+    "@fastify/jwt": "^9.0.2",
+    "@fastify/swagger": "^9.4.2",
+    "@fastify/swagger-ui": "^5.2.2",
+    "@kubernetes/client-node": "^1.4.0",
+    "@prisma/client": "^6.5.0",
+    "@scalar/fastify-api-reference": "^1.28.14",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.3.1",
+    "nodemailer": "^9.0.3",
+    "pino-pretty": "^13.1.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.14.0",
+    "@types/nodemailer": "^8.0.1",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.3",
+    "typescript": "~5.8.2"
+  }
+}

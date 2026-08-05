@@ -1,0 +1,25 @@
+👤 Admin user already exists: suddymax0001@gmail.com
+
+🚀 DigiWise Hosting API running on http://0.0.0.0:4000
+📖 API Docs: http://localhost:4000/docs
+📖 Swagger UI: http://localhost:4000/documentation
+❤️  Health: http://localhost:4000/health
+
+[19:53:32.919] [32mINFO[39m (18480): [36mServer listening at http://127.0.0.1:4000[39m
+[19:53:32.919] [32mINFO[39m (18480): [36mServer listening at http://192.168.56.1:4000[39m
+[19:53:32.919] [32mINFO[39m (18480): [36mServer listening at http://192.168.0.104:4000[39m
+[19:53:40.527] [32mINFO[39m (18480): [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/health",
+      "host": "localhost:4000",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57638
+    }
+[19:53:40.537] [32mINFO[39m (18480): [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 9.282900000000154

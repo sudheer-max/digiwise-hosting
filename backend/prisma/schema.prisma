@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  password     String
+  githubId     String?
+  avatarUrl    String?
+  role         String    @default("user")
+  plan         String    @default("trial")
+  planStatus   String    @default("trial")
+  serviceLimit Int       @default(4)
+  planStartedAt DateTime?
+  planRenewsAt  DateTime?
+  lastMeteredAt DateTime?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  projects Project[]
+  meters   UsageMeter[]
+
+  @@map("users")
+}
+
+model UsageMeter {
+  id            String   @id @default(cuid())
+  userId        String
+  serviceType   String   @default("app")
+  serviceId     String   @default("")
+  serviceName   String   @default("")
+  period        String @default("") // 'yyyy-MM'
+  credits       Float    @default(0)
+  running       Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceId, period])
+  @@index([userId, period])
+  @@map("usage_meters")
+}
+
+model Project {
+  id                String   @id @default(cuid())
+  userId            String
+  name              String
+  k8sNamespace      String   @unique
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("projects")
+}
