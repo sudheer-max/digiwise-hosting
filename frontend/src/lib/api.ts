@@ -23,7 +23,7 @@ class ApiClient {
     return this.token;
   }
 
-  private async request(path: string, options: RequestInit = {}) {
+  private async request(path: string, options: RequestInit = {}, timeoutMs = 8000) {
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string> || {}),
     };
@@ -34,12 +34,19 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `HTTP ${res.status}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${API_BASE}${path}`, { ...options, headers, signal: controller.signal });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } finally {
+      clearTimeout(timer);
     }
-    return res.json();
   }
 
   // Auth

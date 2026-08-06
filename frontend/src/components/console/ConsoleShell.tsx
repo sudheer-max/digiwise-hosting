@@ -281,6 +281,8 @@ export default function ConsoleShell() {
       group: 'Workspace',
       items: [
         { key: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, route: { name: 'projects' } as Route, active: route.name === 'projects' || route.name === 'project', count: counts.projects },
+        { key: 'applications', label: 'Applications', icon: <Rocket className="w-4 h-4" />, route: { name: 'applications' } as Route, active: route.name === 'applications' || route.name === 'application', count: counts.apps },
+        { key: 'databases', label: 'Databases', icon: <Database className="w-4 h-4" />, route: { name: 'databases' } as Route, active: route.name === 'databases' || route.name === 'database', count: counts.dbs },
         { key: 'templates', label: 'Templates', icon: <LayoutTemplate className="w-4 h-4" />, route: { name: 'templates' } as Route, active: route.name === 'templates' },
         { key: 'usage', label: 'Usage', icon: <Gauge className="w-4 h-4" />, route: { name: 'usage' } as Route, active: route.name === 'usage' },
         { key: 'people', label: 'People', icon: <Users className="w-4 h-4" />, route: { name: 'people' } as Route, active: route.name === 'people' },

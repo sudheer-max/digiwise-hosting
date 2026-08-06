@@ -48,12 +48,28 @@ export default function OverviewView() {
   const [health, setHealth] = useState<any>(null);
   const [healthErr, setHealthErr] = useState('');
   const [infraStatuses, setInfraStatuses] = useState<Record<string, 'checking' | 'online' | 'offline'>>({});
+  const [totalDbs, setTotalDbs] = useState(0);
 
   useEffect(() => {
     api.healthCheck().then((h) => {
       setHealth(h);
     }).catch((e: any) => setHealthErr(e.message || 'Health check unavailable'));
   }, []);
+
+  useEffect(() => {
+    if (!projects || projects.length === 0) return;
+    const loadDbCount = async () => {
+      let count = 0;
+      for (const p of projects) {
+        try {
+          const dbs = await api.listDatabases(p.k8sNamespace);
+          if (Array.isArray(dbs)) count += dbs.length;
+        } catch { /* skip */ }
+      }
+      setTotalDbs(count);
+    };
+    loadDbCount();
+  }, [projects]);
 
   useEffect(() => {
     const check = async () => {
@@ -84,8 +100,7 @@ export default function OverviewView() {
     check();
   }, []);
 
-  const totalApps = (projects || []).reduce((acc, p) => acc + (p.applications?.length || 0), 0);
-  const totalDbs = (projects || []).reduce((acc, p) => acc + (p.databases?.length || 0), 0);
+  const totalApps = (projects || []).reduce((acc, p) => acc + (p.apps?.length || 0), 0);
 
   const recentProjects = [...(projects || [])].slice(0, 4);
   const healthy = health ? (health.status === 'ok' || health.healthy || health.status === 'healthy') : false;
@@ -175,7 +190,7 @@ export default function OverviewView() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5">
-                      {p.applications?.length || 0} apps
+                      {p.apps?.length || 0} apps
                     </span>
                     <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#00459c] transition-colors" />
                   </div>

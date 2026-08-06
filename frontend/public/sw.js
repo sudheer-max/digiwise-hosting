@@ -1,6 +1,5 @@
-const CACHE_NAME = 'digiwise-v1';
+const CACHE_NAME = 'digiwise-v2';
 const STATIC_ASSETS = [
-  '/',
   '/favicon.png',
   '/DIGIWISE-SOFTECH-LOGO.png',
   '/manifest.json',
@@ -19,9 +18,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+        cacheNames.map((name) => caches.delete(name))
       );
     })
   );
@@ -33,7 +30,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/auth')) {
+  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/auth') || url.pathname.startsWith('/admin')) {
     event.respondWith(
       fetch(event.request).catch(() => {
         return new Response(JSON.stringify({ error: 'Offline' }), {
@@ -45,21 +42,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.includes('/console') || url.pathname.includes('/dashboard') || url.pathname.includes('/auth')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        event.waitUntil(
-          fetch(event.request).then((networkResponse) => {
-            if (networkResponse.ok) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          }).catch(() => {})
-        );
-        return cachedResponse;
-      }
-
       return fetch(event.request).then((networkResponse) => {
         if (networkResponse.ok) {
           const responseToCache = networkResponse.clone();
@@ -68,6 +57,8 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
+      }).catch(() => {
+        return cachedResponse || new Response('Offline', { status: 503 });
       });
     })
   );
