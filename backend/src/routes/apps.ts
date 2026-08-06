@@ -25,12 +25,14 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId } = request.params;
     const { name, image, port, env, replicas } = request.body;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -72,11 +74,13 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -120,11 +124,13 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId, name } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -181,12 +187,14 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId, name } = request.params;
     const { image, env, replicas } = request.body;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -233,11 +241,13 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId, name } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -279,12 +289,14 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId, name } = request.params;
     const { replicas } = request.body;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -321,12 +333,14 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId, name } = request.params;
     const { lines = 100 } = request.query;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {
@@ -361,11 +375,13 @@ export async function appRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { projectId, name } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: user.id },
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
     });
 
     if (!project) {

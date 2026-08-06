@@ -4,7 +4,6 @@ import DigiWiseHeader from './components/DigiWiseHeader';
 import LandingView from './components/LandingView';
 import DashboardView from './components/DashboardView';
 import AdminDashboardView from './components/AdminDashboardView';
-import HostingView from './components/HostingView';
 import SupportView from './components/SupportView';
 import BillingView from './components/BillingView';
 import CheckoutView from './components/CheckoutView';
@@ -73,12 +72,6 @@ function AppInner() {
 
           {activeTab === 'admin-dashboard' && isAdmin && (
             <AdminDashboardView />
-          )}
-
-          {activeTab === 'hosting' && (
-            <HostingView
-              onConfigurePlan={handleSelectPlan}
-            />
           )}
 
           {activeTab === 'support' && (

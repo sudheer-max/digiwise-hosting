@@ -135,7 +135,7 @@ export default function CheckoutView({ selectedPlan, cartItems = [], onPurchaseC
           <p className="text-slate-500 text-sm mb-8">Nothing to checkout. Choose a hosting plan to get started.</p>
           <div className="flex gap-4 justify-center">
             <Link
-              href="/hosting"
+              href="/dashboard"
               className="bg-[#00459c] hover:bg-[#003882] text-white font-bold text-xs uppercase tracking-wider px-6 py-3 rounded-lg transition-colors"
             >
               View Hosting Plans

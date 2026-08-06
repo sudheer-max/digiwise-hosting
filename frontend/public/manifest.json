@@ -1,0 +1,28 @@
+{
+  "name": "DigiWise Hosting",
+  "short_name": "DigiWise",
+  "description": "Managed Kubernetes platform with K3s, Traefik, ArgoCD and Longhorn. Deploy apps, databases and sites on a production-grade cluster.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#00459c",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/DIGIWISE-SOFTECH-LOGO.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/DIGIWISE-SOFTECH-LOGO.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["developer tools", "business", "productivity"],
+  "lang": "en",
+  "dir": "ltr"
+}

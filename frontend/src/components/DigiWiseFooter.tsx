@@ -9,11 +9,11 @@ export default function DigiWiseFooter() {
     {
       heading: 'Platform',
       links: [
-        { label: 'Deployments', href: '/hosting' },
-        { label: 'Managed Databases', href: '/hosting' },
-        { label: 'Domains', href: '/hosting' },
+        { label: 'Deployments', href: '/dashboard' },
+        { label: 'Managed Databases', href: '/dashboard' },
+        { label: 'Domains', href: '/dashboard' },
         { label: 'Business Email', href: '/email' },
-        { label: 'VPS Compute', href: '/hosting' },
+        { label: 'VPS Compute', href: '/dashboard' },
       ],
     },
     {
@@ -45,7 +45,7 @@ export default function DigiWiseFooter() {
           {/* Brand Column */}
           <div className="md:col-span-4 flex flex-col gap-4">
             <Link href="/" className="flex items-center gap-2.5 cursor-pointer">
-              <img src="/logo.png" alt="DigiWise Logo" className="h-8 w-auto" />
+              <img src="/DIGIWISE-SOFTECH-LOGO.png" alt="DigiWise Logo" className="h-8 w-auto" />
               <span className="text-xl font-bold text-slate-900 tracking-tight font-display">
                 DigiWise<span className="text-[#00459c]">.</span>
               </span>

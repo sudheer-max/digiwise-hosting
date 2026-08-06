@@ -1,0 +1,70 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: digiwise-postgres
+  namespace: digiwise-databases
+spec:
+  description: "DigiWise PostgreSQL primary instance"
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+  instances: 1
+  startDelay: 30
+  stopDelay: 30
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      work_mem: "16MB"
+      maintenance_work_mem: "128MB"
+      wal_buffers: "8MB"
+      checkpoint_completion_target: "0.9"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+    pg_hba:
+      - host all all 0.0.0.0/0 md5
+  bootstrap:
+    initdb:
+      database: digiwise
+      owner: digiwise-db
+      secret:
+        name: digiwise-db-credentials
+  storage:
+    size: 10Gi
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  monitoring:
+    enablePodMonitor: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: digiwise-postgres-external
+  namespace: digiwise-databases
+  labels:
+    cnpg.io/cluster: digiwise-postgres
+spec:
+  type: NodePort
+  selector:
+    cnpg.io/cluster: digiwise-postgres
+    role: primary
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+      nodePort: 30543
+      protocol: TCP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: digiwise-db-credentials
+  namespace: digiwise-databases
+type: kubernetes.io/basic-auth
+stringData:
+  username: digiwise-db
+  password: "digiwise-password"

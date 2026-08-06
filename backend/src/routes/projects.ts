@@ -62,11 +62,13 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {
@@ -173,12 +175,14 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
     const { name, description } = request.body;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {
@@ -219,11 +223,13 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {
@@ -260,11 +266,13 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {
@@ -285,11 +293,13 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {
@@ -317,12 +327,14 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
     const { pod, lines = 100 } = request.query;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {
@@ -362,12 +374,14 @@ export async function projectRoutes(app: FastifyInstance) {
     },
     preHandler: app.authenticate,
   }, async (request, reply) => {
-    const user = request.user as { id: string };
+    const user = request.user as { id: string; role?: string };
     const { id } = request.params;
     const { name, repoURL, path, targetRevision } = request.body;
 
     const project = await prisma.project.findFirst({
-      where: { id, userId: user.id },
+      where: user.role === 'admin'
+        ? { id }
+        : { id, userId: user.id },
     });
 
     if (!project) {

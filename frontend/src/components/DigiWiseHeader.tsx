@@ -23,10 +23,9 @@ export default function DigiWiseHeader({ cartCount = 0, onNavigate }: HeaderProp
   let activeTab = 'landing';
   if (pathname === '/' || pathname === '') activeTab = 'landing';
   else if (pathname.includes('/dashboard')) activeTab = 'dashboard';
-  else if (pathname.includes('/hosting')) activeTab = 'hosting';
-  else if (pathname.includes('/vps')) activeTab = 'hosting';
-  else if (pathname.includes('/domains')) activeTab = 'hosting';
-  else if (pathname.includes('/email')) activeTab = 'hosting';
+  else if (pathname.includes('/vps')) activeTab = 'dashboard';
+  else if (pathname.includes('/domains')) activeTab = 'dashboard';
+  else if (pathname.includes('/email')) activeTab = 'dashboard';
   else if (pathname.includes('/support')) activeTab = 'support';
   else if (pathname.includes('/billing')) activeTab = 'billing';
   else if (pathname.includes('/checkout')) activeTab = 'checkout';
@@ -125,7 +124,7 @@ export default function DigiWiseHeader({ cartCount = 0, onNavigate }: HeaderProp
             }}
             className="flex items-center gap-2.5 cursor-pointer"
           >
-            <img src="/logo.png" alt="DigiWise Logo" className="h-8 w-auto" />
+            <img src="/DIGIWISE-SOFTECH-LOGO.png" alt="DigiWise Logo" className="h-8 w-auto" />
             <span className="text-xl font-bold text-slate-900 tracking-tight font-display">
               DigiWise<span className="text-[#00459c]">.</span>
             </span>

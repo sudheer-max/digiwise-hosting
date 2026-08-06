@@ -7,7 +7,7 @@ export default function PurchasePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/hosting');
+    router.replace('/dashboard');
   }, [router]);
 
   return (

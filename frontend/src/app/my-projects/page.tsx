@@ -7,7 +7,7 @@ export default function MyProjectsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/hosting');
+    router.replace('/dashboard');
   }, [router]);
 
   return (

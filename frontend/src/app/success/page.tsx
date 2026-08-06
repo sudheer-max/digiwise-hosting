@@ -44,7 +44,7 @@ function SuccessContent() {
       router.push(`/create-website?plan=${encodeURIComponent(planName)}`);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      router.push('/my-projects');
+      router.push('/dashboard');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
