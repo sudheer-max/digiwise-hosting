@@ -7,7 +7,7 @@ import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
   SectionHeader, GhostButton, PrimaryButton, Loader, EmptyState, ErrorBanner,
-  StatusPill, Field, FieldGrid, CopyField, Modal
+  StatusPill, Field, FieldGrid, CopyField, Modal, ConfirmDeleteDialog
 } from '../ui';
 
 type Tab = 'overview' | 'env' | 'deployments' | 'logs' | 'advanced';
@@ -21,6 +21,7 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
   const [tab, setTab] = useState<Tab>('overview');
   const [busy, setBusy] = useState('');
   const [deployments, setDeployments] = useState<any[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [logText, setLogText] = useState('');
   const [logOpen, setLogOpen] = useState(false);
 
@@ -49,9 +50,8 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
       if (action === 'restart') await api.restartApp(projectId, name);
       else if (action === 'stop') await api.scaleApp(projectId, name, 0);
       else if (action === 'delete') {
-        if (!confirm('Delete this application permanently?')) return;
-        await api.deleteApp(projectId, name);
-        navigate({ name: 'applications' });
+        setShowDeleteConfirm(true);
+        setBusy('');
         return;
       }
       await loadApp();
@@ -60,6 +60,19 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
       setError(err.message || `Action failed: ${action}`);
     } finally {
       setBusy('');
+    }
+  };
+
+  const confirmDelete = async () => {
+    setBusy('delete');
+    try {
+      await api.deleteApp(projectId, name);
+      navigate({ name: 'applications' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete application');
+    } finally {
+      setBusy('');
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -252,6 +265,17 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
         <Modal title={<span className="flex items-center gap-2"><Terminal className="w-4 h-4" /> Logs — {app.name}</span>} onClose={() => setLogOpen(false)} wide>
           <pre className="bg-slate-950 text-emerald-300 p-4 text-[11px] font-mono leading-relaxed overflow-auto max-h-[55vh] whitespace-pre-wrap break-words">{logText}</pre>
         </Modal>
+      )}
+
+      {showDeleteConfirm && (
+        <ConfirmDeleteDialog
+          title="Delete Application"
+          description={`Are you sure you want to delete "${name}"? This will permanently remove the application, its service, and ingress route.`}
+          confirmName={name}
+          onConfirm={confirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          busy={busy === 'delete'}
+        />
       )}
     </div>
   );

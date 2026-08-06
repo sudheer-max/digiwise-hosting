@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Rocket, GitBranch, Box, Copy, Check, ChevronRight, Plus } from 'lucide-react';
+import { Rocket, GitBranch, Box, Copy, Check, ChevronRight, Plus, Globe, ExternalLink, Github } from 'lucide-react';
 import { useConsole } from '../ConsoleShell';
-import { SectionHeader, Loader, EmptyState, ErrorBanner, StatusPill, CopyField, PrimaryButton } from '../ui';
+import { SectionHeader, Loader, EmptyState, ErrorBanner, StatusPill, CopyField, PrimaryButton, GhostButton } from '../ui';
 import CreateApplicationWizard from '../CreateApplicationWizard';
 
 export default function ApplicationsView() {
@@ -32,11 +32,35 @@ export default function ApplicationsView() {
       {loading ? (
         <Loader label="Loading applications..." />
       ) : apps.length === 0 ? (
-        <EmptyState
-          icon={<Rocket className="w-6 h-6" />}
-          title="No applications"
-          hint="Deploy a web service from a git repository or Docker image."
-        />
+        <div className="bg-white border border-slate-200 shadow-sm p-10 text-center">
+          <Rocket className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-900 mb-2">No applications yet</h3>
+          <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+            Deploy a web service from a Docker image, GitHub repository, or use a template to get started in seconds.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <PrimaryButton onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4" /> Deploy Application
+            </PrimaryButton>
+          </div>
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
+            <div className="bg-slate-50 border border-slate-200 p-4">
+              <Box className="w-6 h-6 text-violet-500 mx-auto mb-2" />
+              <div className="text-xs font-bold text-slate-700">Docker Image</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Deploy any container</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 p-4">
+              <Github className="w-6 h-6 text-slate-700 mx-auto mb-2" />
+              <div className="text-xs font-bold text-slate-700">GitHub Repo</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Auto-build & deploy</div>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 p-4">
+              <Globe className="w-6 h-6 text-[#00459c] mx-auto mb-2" />
+              <div className="text-xs font-bold text-slate-700">Custom Build</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Your own Dockerfile</div>
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="bg-white border border-slate-200 shadow-sm">
           {apps.map((app, idx) => {
@@ -70,6 +94,11 @@ export default function ApplicationsView() {
                     <span className="uppercase font-bold text-slate-300 bg-slate-100 px-1.5 py-0.5">{source}</span>
                   </div>
                   {app.replicas != null && <span className="text-[10px] font-bold text-slate-400">{app.replicas} replica(s)</span>}
+                  {app.externalUrl && (
+                    <a href={app.externalUrl} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="text-[#00459c] hover:text-[#003882]">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-[#00459c]" />
                 </div>
               </button>

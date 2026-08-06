@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Copy, Loader2, X, AlertTriangle, RefreshCw, ChevronDown } from 'lucide-react';
+import { Check, Copy, Loader2, X, AlertTriangle, RefreshCw, ChevronDown, Trash2 } from 'lucide-react';
 
 export function StatusPill({ status }: { status?: string | null | object }) {
   const s = (typeof status === 'string' ? status : 'idle').toUpperCase();
@@ -229,4 +229,59 @@ export function Field({ label, value, copyable }: { label: string; value?: React
 export function FieldGrid({ children, cols = 3 }: { children: React.ReactNode; cols?: 2 | 3 | 4 }) {
   const map = { 2: 'grid-cols-1 sm:grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3', 4: 'grid-cols-2 lg:grid-cols-4' };
   return <div className={`grid ${map[cols]} gap-5`}>{children}</div>;
+}
+
+export function ConfirmDeleteDialog({
+  title,
+  description,
+  confirmName,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  title: string;
+  description: string;
+  confirmName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy?: boolean;
+}) {
+  const [typed, setTyped] = useState('');
+  const enabled = typed.trim() === confirmName.trim();
+
+  return (
+    <Modal title={<span className="flex items-center gap-2 text-rose-600"><AlertTriangle className="w-4 h-4" /> {title}</span>} onClose={onCancel}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600">{description}</p>
+        <div className="bg-rose-50 border border-rose-200 px-4 py-3 text-xs text-rose-700">
+          This action <strong>cannot be undone</strong>. All associated resources will be permanently deleted.
+        </div>
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+            Type <span className="font-mono text-rose-600">{confirmName}</span> to confirm
+          </label>
+          <input
+            type="text"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={confirmName}
+            className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-rose-400"
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter' && enabled) onConfirm(); }}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <GhostButton onClick={onCancel}>Cancel</GhostButton>
+          <button
+            onClick={onConfirm}
+            disabled={!enabled || busy}
+            className="inline-flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-4 py-2.5 transition-colors cursor-pointer"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {busy ? 'Deleting...' : 'Delete permanently'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
 }

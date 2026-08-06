@@ -4,7 +4,7 @@ import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
   SectionHeader, GhostButton, PrimaryButton, Loader, EmptyState, ErrorBanner,
-  StatusPill, Field, FieldGrid, CopyField, Modal
+  StatusPill, Field, FieldGrid, CopyField, Modal, ConfirmDeleteDialog
 } from '../ui';
 
 const DB_INFO: Record<string, { label: string; icon: string; color: string }> = {
@@ -63,6 +63,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('variables');
   const [busy, setBusy] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState('');
   const [activeLang, setActiveLang] = useState('nodejs');
@@ -87,7 +88,10 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   useEffect(() => { setLoading(true); load(); }, [load]);
 
   const doDelete = async () => {
-    if (!confirm('Delete this database permanently? All data will be lost.')) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
     setError('');
     setBusy('delete');
     try {
@@ -98,6 +102,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
       setError(err.message || 'Failed to delete database');
     } finally {
       setBusy('');
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -373,6 +378,17 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
         <Modal title={<span className="flex items-center gap-2"><Terminal className="w-4 h-4" /> Logs — {dbName}</span>} onClose={() => setLogOpen(false)} wide>
           <pre className="bg-slate-950 text-emerald-300 p-4 text-[11px] font-mono leading-relaxed overflow-auto max-h-[55vh] whitespace-pre-wrap break-words">{logText}</pre>
         </Modal>
+      )}
+
+      {showDeleteConfirm && (
+        <ConfirmDeleteDialog
+          title="Delete Database"
+          description={`Are you sure you want to delete the ${info.label} database "${dbName}"? All data will be permanently lost.`}
+          confirmName={dbName}
+          onConfirm={confirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+          busy={busy === 'delete'}
+        />
       )}
     </div>
   );

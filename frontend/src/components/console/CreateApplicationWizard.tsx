@@ -14,6 +14,7 @@ interface Project {
   name: string;
   description?: string;
   namespace: string;
+  k8sNamespace?: string;
 }
 
 const DB_TYPES = ['postgresql', 'mongodb', 'mysql', 'redis'] as const;
