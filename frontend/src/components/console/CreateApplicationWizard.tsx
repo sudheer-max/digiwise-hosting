@@ -26,15 +26,16 @@ const DB_LABELS: Record<string, string> = {
   redis: 'Redis',
 };
 
-export default function CreateApplicationWizard({ onClose, onCreated }: {
+export default function CreateApplicationWizard({ onClose, onCreated, projectId: initialProjectId }: {
   onClose: () => void;
   onCreated?: (id: string) => void;
+  projectId?: string;
 }) {
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>(initialProjectId ? 2 : 1);
 
   // Step 1: project
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || '');
   const [createNewProject, setCreateNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDesc, setNewProjectDesc] = useState('');

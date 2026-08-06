@@ -349,7 +349,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
 
       {/* Create App Wizard */}
       {showCreateApp && (
-        <CreateApplicationWizard onClose={() => setShowCreateApp(false)} onCreated={() => { setShowCreateApp(false); load(); }} />
+        <CreateApplicationWizard onClose={() => setShowCreateApp(false)} onCreated={() => { setShowCreateApp(false); load(); }} projectId={projectId} />
       )}
 
       {/* Delete Confirmation */}
