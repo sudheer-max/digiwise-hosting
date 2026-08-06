@@ -7,7 +7,8 @@ import {
   UserRound, Users, ScrollText, KeyRound, Sparkles, Tag, GitFork,
   HardDriveDownload, ShieldCheck as ShieldCert, Network as NetworkCluster,
   Bell, KeySquare, Palette, Fingerprint, LayoutTemplate, CreditCard,
-  Wallet, Share2, BookOpen, Radio, MessageSquare, Home, UserCog
+  Wallet, Share2, BookOpen, Radio, MessageSquare, Home, UserCog,
+  Cpu, Workflow, Camera, LineChart, Warehouse
 } from 'lucide-react';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -56,6 +57,7 @@ import ReferralsView from './views/ReferralsView';
 import DocsView from './views/DocsView';
 import CentralStationView from './views/CentralStationView';
 import SupportThreadsView from './views/SupportThreadsView';
+import InfrastructureView from './views/InfrastructureView';
 
 export type Route =  | { name: 'overview' }
   | { name: 'projects' }
@@ -101,7 +103,8 @@ export type Route =  | { name: 'overview' }
   | { name: 'referrals' }
   | { name: 'docs' }
   | { name: 'centralStation' }
-  | { name: 'supportThreads' };
+  | { name: 'supportThreads' }
+  | { name: 'infrastructure' };
 
 const ROUTE_TITLES: Record<string, string> = {
   overview: 'Home',
@@ -149,6 +152,7 @@ const ROUTE_TITLES: Record<string, string> = {
   docs: 'Documentation',
   centralStation: 'Central Station',
   supportThreads: 'Support Threads',
+  infrastructure: 'Infrastructure',
 };
 
 interface ConsoleData {
@@ -225,7 +229,7 @@ export default function ConsoleShell() {
   const initialRoute = (() => {
     if (typeof window !== 'undefined') {
       const view = new URLSearchParams(window.location.search).get('view');
-      const valid = ['projects', 'templates', 'usage', 'plans', 'billing', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview'];
+      const valid = ['projects', 'templates', 'usage', 'plans', 'billing', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview'];
       if (view && valid.includes(view)) return { name: view } as Route;
     }
     return { name: 'overview' } as Route;
@@ -313,6 +317,12 @@ export default function ConsoleShell() {
         { key: 'supportThreads', label: 'Support Threads', icon: <MessageSquare className="w-4 h-4" />, route: { name: 'supportThreads' } as Route, active: route.name === 'supportThreads' },
       ],
     },
+    {
+      group: 'Infrastructure',
+      items: [
+        { key: 'infrastructure', label: 'Services', icon: <Cpu className="w-4 h-4" />, route: { name: 'infrastructure' } as Route, active: route.name === 'infrastructure' },
+      ],
+    },
   ].map((group) => ({
     ...group,
     items: group.items.filter((item) => isAdmin || !ADMIN_ONLY_KEYS.has(item.key)),
@@ -365,6 +375,7 @@ export default function ConsoleShell() {
       case 'docs': return <DocsView />;
       case 'centralStation': return <CentralStationView />;
       case 'supportThreads': return <SupportThreadsView />;
+      case 'infrastructure': return <InfrastructureView />;
       default: return <OverviewView />;
     }
   };

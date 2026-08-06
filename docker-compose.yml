@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    container_name: digiwise-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: digiwise
+      POSTGRES_USER: digiwise-db
+      POSTGRES_PASSWORD: digiwise-password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digiwise-db -d digiwise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: digiwise-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.docker
+    environment:
+      DATABASE_URL: postgresql://digiwise-db:digiwise-password@postgresql:5432/digiwise
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: digiwise-frontend
+    restart: unless-stopped
+    volumes:
+      - frontend_dist:/app/dist
+
+  nginx:
+    image: nginx:alpine
+    container_name: digiwise-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - frontend_dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  frontend_dist:
