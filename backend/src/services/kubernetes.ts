@@ -404,19 +404,4 @@ export async function deleteIngressRoute(namespace: string, name: string): Promi
   } catch { /* ignore if not found */ }
 }
 
-// Execute a command in a container (for building Docker images)
-export async function execInPod(namespace: string, podName: string, containerName: string, command: string[]): Promise<string> {
-  try {
-    const exec = new k8s.Exec(kc);
-    const stream = await exec.exec(namespace, podName, containerName, command, coreApi, 10000);
-    let output = '';
-    stream.on('data', (data: Buffer) => { output += data.toString(); });
-    stream.on('error', (err: Error) => { output += `ERROR: ${err.message}`; });
-    return new Promise((resolve) => {
-      stream.on('close', () => resolve(output));
-      setTimeout(() => { stream.close(); resolve(output); }, 300000);
-    });
-  } catch (err: any) {
-    throw new Error(`Exec failed: ${err.message}`);
-  }
-}
+
