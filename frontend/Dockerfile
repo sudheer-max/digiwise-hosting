@@ -20,6 +20,6 @@ COPY --from=builder /app/public ./public
 # Copy nginx config for SPA routing
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-EXPOSE 3000
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

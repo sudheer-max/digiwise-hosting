@@ -93,6 +93,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedCountry, setSelectedCountryState] = useState('India');
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const savedCart = localStorage.getItem('digiwise_cart');
     if (savedCart) {
       try {

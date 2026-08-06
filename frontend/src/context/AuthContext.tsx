@@ -27,20 +27,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('digiwise_token') : null;
-    if (token) {
-      api.setToken(token);
-      api.getMe()
-        .then((userData) => {
-          setUser(userData as User);
-        })
-        .catch(() => {
-          api.setToken(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+
+    setLoading(false);
+
+    if (!token) return;
+
+    api.setToken(token);
+    api.getMe()
+      .then((userData) => {
+        if (!cancelled) setUser(userData as User);
+      })
+      .catch(() => {
+        api.setToken(null);
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
   const login = async (email: string, password: string) => {

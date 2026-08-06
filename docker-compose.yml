@@ -48,7 +48,7 @@ services:
     container_name: digiwise-frontend
     restart: unless-stopped
     volumes:
-      - frontend_dist:/app/dist
+      - frontend_dist:/usr/share/nginx/html
 
   nginx:
     image: nginx:alpine
