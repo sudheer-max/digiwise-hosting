@@ -5,6 +5,7 @@ import { assertProjectOwned, OwnershipError } from '../services/ownership.js';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logAudit } from '../services/audit.js';
 
 export async function appRoutes(app: FastifyInstance) {
   // Create a new application (deployment + service)
@@ -60,6 +61,17 @@ export async function appRoutes(app: FastifyInstance) {
         port,
         port
       );
+
+      // Audit log
+      await logAudit({
+        userId: user.id,
+        action: 'app.create',
+        resource: 'app',
+        resourceId: name,
+        details: { projectId, name, image, port, replicas: replicas || 1 },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
 
       return reply.status(201).send({ deployment, service });
     } catch (err: any) {
@@ -262,6 +274,17 @@ export async function appRoutes(app: FastifyInstance) {
         k8s.deleteDeployment(project.k8sNamespace, name),
         k8s.deleteService(project.k8sNamespace, name).catch(() => {}),
       ]);
+
+      // Audit log
+      await logAudit({
+        userId: user.id,
+        action: 'app.delete',
+        resource: 'app',
+        resourceId: name,
+        details: { projectId, name },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
 
       return { success: true };
     } catch (err: any) {
@@ -490,6 +513,17 @@ export async function appRoutes(app: FastifyInstance) {
         );
       } catch { /* ingress creation is optional */ }
 
+      // Audit log
+      await logAudit({
+        userId: user.id,
+        action: 'app.deploy-github',
+        resource: 'app',
+        resourceId: name,
+        details: { projectId, name, repoURL, branch, port },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
       return reply.status(201).send({
         success: true,
         name,
@@ -558,6 +592,221 @@ export async function appRoutes(app: FastifyInstance) {
       }
 
       return { envVars };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  // Set/Update environment variables (bulk replace)
+  app.put<{ Params: { projectId: string; name: string }; Body: { variables: Record<string, string> } }>('/api/projects/:projectId/apps/:name/variables', {
+    schema: {
+      tags: ['Applications'],
+      description: 'Set environment variables (replaces all env vars on the deployment)',
+      params: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string' },
+          name: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['variables'],
+        properties: {
+          variables: { type: 'object', additionalProperties: { type: 'string' } },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { projectId, name } = request.params;
+    const { variables } = request.body;
+
+    const project = await prisma.project.findFirst({
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    try {
+      // Get the existing deployment
+      const existing = await k8s.k8sAppsApi.readNamespacedDeployment({ name, namespace: project.k8sNamespace });
+      const containers = existing.spec?.template?.spec?.containers || [];
+      const targetContainer = containers.find(c => c.name === name);
+
+      if (!targetContainer) {
+        return reply.status(404).send({ error: 'Application container not found' });
+      }
+
+      // Update env vars on the container
+      targetContainer.env = Object.entries(variables).map(([key, value]) => ({
+        name: key,
+        value,
+      }));
+
+      // Patch the deployment to trigger a rolling restart
+      const patch = [
+        { op: 'replace', path: '/spec/template/spec/containers', value: containers },
+      ];
+
+      await k8s.k8sAppsApi.patchNamespacedDeployment({
+        name,
+        namespace: project.k8sNamespace,
+        body: patch,
+      });
+
+      // Audit log
+      await logAudit({
+        userId: user.id,
+        action: 'env.update',
+        resource: 'app',
+        resourceId: name,
+        details: { projectId, variables: Object.keys(variables) },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return { success: true, variables };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  // Add/Update a single environment variable
+  app.patch<{ Params: { projectId: string; name: string }; Body: { key: string; value: string } }>('/api/projects/:projectId/apps/:name/variables', {
+    schema: {
+      tags: ['Applications'],
+      description: 'Add or update a single environment variable',
+      params: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string' },
+          name: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['key', 'value'],
+        properties: {
+          key: { type: 'string', minLength: 1 },
+          value: { type: 'string' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { projectId, name } = request.params;
+    const { key, value } = request.body;
+
+    const project = await prisma.project.findFirst({
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    try {
+      const existing = await k8s.k8sAppsApi.readNamespacedDeployment({ name, namespace: project.k8sNamespace });
+      const containers = existing.spec?.template?.spec?.containers || [];
+      const targetContainer = containers.find(c => c.name === name);
+
+      if (!targetContainer) {
+        return reply.status(404).send({ error: 'Application container not found' });
+      }
+
+      // Add or update the specific env var
+      const envVars = targetContainer.env || [];
+      const existingIndex = envVars.findIndex(e => e.name === key);
+
+      if (existingIndex >= 0) {
+        envVars[existingIndex].value = value;
+      } else {
+        envVars.push({ name: key, value });
+      }
+
+      targetContainer.env = envVars;
+
+      const patch = [
+        { op: 'replace', path: '/spec/template/spec/containers', value: containers },
+      ];
+
+      await k8s.k8sAppsApi.patchNamespacedDeployment({
+        name,
+        namespace: project.k8sNamespace,
+        body: patch,
+      });
+
+      return { success: true, key, value };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  // Delete an environment variable
+  app.delete<{ Params: { projectId: string; name: string; key: string } }>('/api/projects/:projectId/apps/:name/variables/:key', {
+    schema: {
+      tags: ['Applications'],
+      description: 'Delete an environment variable',
+      params: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string' },
+          name: { type: 'string' },
+          key: { type: 'string' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { projectId, name, key } = request.params;
+
+    const project = await prisma.project.findFirst({
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    try {
+      const existing = await k8s.k8sAppsApi.readNamespacedDeployment({ name, namespace: project.k8sNamespace });
+      const containers = existing.spec?.template?.spec?.containers || [];
+      const targetContainer = containers.find(c => c.name === name);
+
+      if (!targetContainer) {
+        return reply.status(404).send({ error: 'Application container not found' });
+      }
+
+      // Remove the specific env var
+      const envVars = (targetContainer.env || []).filter(e => e.name !== key);
+      targetContainer.env = envVars;
+
+      const patch = [
+        { op: 'replace', path: '/spec/template/spec/containers', value: containers },
+      ];
+
+      await k8s.k8sAppsApi.patchNamespacedDeployment({
+        name,
+        namespace: project.k8sNamespace,
+        body: patch,
+      });
+
+      return { success: true, deleted: key };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
     }

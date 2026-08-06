@@ -26,6 +26,7 @@ model User {
 
   projects Project[]
   meters   UsageMeter[]
+  auditLogs AuditLog[]
 
   @@map("users")
 }
@@ -61,4 +62,25 @@ model Project {
 
   @@index([userId])
   @@map("projects")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String   // e.g., 'project.create', 'app.deploy', 'env.update'
+  resource    String   // e.g., 'project', 'app', 'database'
+  resourceId  String?  // ID of the affected resource
+  details     Json?    // Additional context (old/new values, metadata)
+  ipAddress   String?
+  userAgent   String?
+  status      String   @default("success") // 'success' or 'failure'
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

@@ -301,6 +301,113 @@ class ApiClient {
     return this.request(`/projects/${projectId}/apps/${name}/variables`);
   }
 
+  // === ENVIRONMENT VARIABLES (CRUD) ===
+
+  setAppVariables(projectId: string, name: string, variables: Record<string, string>) {
+    return this.request(`/projects/${projectId}/apps/${name}/variables`, {
+      method: 'PUT',
+      body: JSON.stringify({ variables }),
+    });
+  }
+
+  setAppVariable(projectId: string, name: string, key: string, value: string) {
+    return this.request(`/projects/${projectId}/apps/${name}/variables`, {
+      method: 'PATCH',
+      body: JSON.stringify({ key, value }),
+    });
+  }
+
+  deleteAppVariable(projectId: string, name: string, key: string) {
+    return this.request(`/projects/${projectId}/apps/${name}/variables/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // === BUILD PIPELINE ===
+
+  triggerBuild(projectId: string, appName: string, input: {
+    repoURL: string; branch?: string; buildCommand?: string;
+    startCommand?: string; port: number; env?: Record<string, string>;
+  }) {
+    return this.request(`/projects/${projectId}/apps/${appName}/builds`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  getBuildStatus(projectId: string, appName: string, buildId: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/builds/${buildId}`);
+  }
+
+  getBuildLogs(projectId: string, appName: string, buildId: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/builds/${buildId}/logs`);
+  }
+
+  listBuilds(projectId: string, appName: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/builds`);
+  }
+
+  cancelBuild(projectId: string, appName: string, buildId: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/builds/${buildId}/cancel`, {
+      method: 'POST',
+    });
+  }
+
+  // === CUSTOM DOMAINS ===
+
+  listDomains(projectId: string, appName: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/domains`);
+  }
+
+  addDomain(projectId: string, appName: string, domain: string, port?: number) {
+    return this.request(`/projects/${projectId}/apps/${appName}/domains`, {
+      method: 'POST',
+      body: JSON.stringify({ domain, port }),
+    });
+  }
+
+  verifyDomain(projectId: string, appName: string, domain: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/domains/${domain}/verify`, {
+      method: 'POST',
+    });
+  }
+
+  deleteDomain(projectId: string, appName: string, domain: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/domains/${domain}`, {
+      method: 'DELETE',
+    });
+  }
+
+  getDomainSslStatus(projectId: string, appName: string, domain: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/domains/${domain}/ssl`);
+  }
+
+  // === AUDIT LOGS ===
+
+  listAuditLogs(params?: { userId?: string; action?: string; resource?: string; limit?: number; offset?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.userId) qs.append('userId', params.userId);
+    if (params?.action) qs.append('action', params.action);
+    if (params?.resource) qs.append('resource', params.resource);
+    if (params?.limit) qs.append('limit', String(params.limit));
+    if (params?.offset) qs.append('offset', String(params.offset));
+    const q = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/audit-logs${q}`);
+  }
+
+  getMyAuditLogs(params?: { action?: string; resource?: string; limit?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.action) qs.append('action', params.action);
+    if (params?.resource) qs.append('resource', params.resource);
+    if (params?.limit) qs.append('limit', String(params.limit));
+    const q = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request(`/audit-logs/mine${q}`);
+  }
+
+  getAuditLogStats() {
+    return this.request('/audit-logs/stats');
+  }
+
   // === MONITORING (via proxy) ===
 
   getGrafanaUrl() {

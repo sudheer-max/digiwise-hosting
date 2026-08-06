@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: digiwise-databases
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: digiwise-hosting
+    env: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: digiwise-hosting
+  source:
+    repoURL: https://github.com/anomalyco/digiwise-hosting.git
+    targetRevision: main
+    path: k8s/base
+    directory:
+      recurse: false
+      jsonnet: {}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: digiwise-databases
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m0s
+  revisionHistoryLimit: 10

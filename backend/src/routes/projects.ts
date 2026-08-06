@@ -4,6 +4,7 @@ import * as k8s from '../services/kubernetes.js';
 import * as argocd from '../services/argocd.js';
 import { OwnershipError, recordProjectOwnership, removeProjectOwnership, listOwnedProjectIds, assertProjectOwned } from '../services/ownership.js';
 import { assertCanCreateService, PlanError } from '../services/plan.js';
+import { logAudit } from '../services/audit.js';
 
 export async function projectRoutes(app: FastifyInstance) {
   // List all projects for the current user
@@ -138,6 +139,17 @@ export async function projectRoutes(app: FastifyInstance) {
         k8sNamespace: nsName,
       });
 
+      // Audit log
+      await logAudit({
+        userId: user.id,
+        action: 'project.create',
+        resource: 'project',
+        resourceId: project.id,
+        details: { name, k8sNamespace: nsName },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
       return reply.status(201).send({
         project: {
           id: project.id,
@@ -252,6 +264,17 @@ export async function projectRoutes(app: FastifyInstance) {
 
     // Remove from database
     await removeProjectOwnership(project.k8sNamespace);
+
+    // Audit log
+    await logAudit({
+      userId: user.id,
+      action: 'project.delete',
+      resource: 'project',
+      resourceId: project.id,
+      details: { name: project.name, k8sNamespace: project.k8sNamespace },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
 
     return { success: true };
   });

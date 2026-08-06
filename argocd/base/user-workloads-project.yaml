@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: digiwise-user-workloads
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: DigiWise Hosting - User Deployed Applications
+  sourceRepos:
+    - 'https://github.com/anomalyco/*'
+    - 'https://gitlab.com/*'
+  destinations:
+    - namespace: 'dw-*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true
+  roles:
+    - name: developer
+      description: Developer role for user workloads
+      policies:
+        - p, proj:digiwise-user-workloads:developer, applications, get, digiwise-user-workloads/*, allow
+        - p, proj:digiwise-user-workloads:developer, applications, sync, digiwise-user-workloads/*, allow
+      groups:
+        - digiwise-users

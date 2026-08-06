@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Rocket, GitBranch, Box, Play, Power, RotateCw, Terminal, Trash2, Globe, Save,
-  ListTree, KeyRound, HardDrive, Cpu, MemoryStick, ArrowUpRight, Layers, Loader2, RefreshCw, ExternalLink, Check
+  ListTree, KeyRound, HardDrive, Cpu, MemoryStick, ArrowUpRight, Layers, Loader2, RefreshCw, ExternalLink, Check,
+  Hammer, Shield
 } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
@@ -9,8 +10,12 @@ import {
   SectionHeader, GhostButton, PrimaryButton, Loader, EmptyState, ErrorBanner,
   StatusPill, Field, FieldGrid, CopyField, Modal, ConfirmDeleteDialog
 } from '../ui';
+import EnvironmentVariablesPanel from './EnvironmentVariablesPanel';
+import BuildPipelinePanel from './BuildPipelinePanel';
+import CustomDomainsPanel from './CustomDomainsPanel';
+import LogsViewerPanel from './LogsViewerPanel';
 
-type Tab = 'overview' | 'env' | 'deployments' | 'logs' | 'advanced';
+type Tab = 'overview' | 'env' | 'builds' | 'domains' | 'logs' | 'deployments' | 'advanced';
 
 export default function ApplicationDetailView({ projectId, name }: { projectId: string; name: string }) {
   const { data, navigate } = useConsole();
@@ -104,8 +109,11 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <Layers className="w-3.5 h-3.5" /> },
-    { id: 'deployments', label: 'Deployments', icon: <ListTree className="w-3.5 h-3.5" /> },
+    { id: 'env', label: 'Variables', icon: <KeyRound className="w-3.5 h-3.5" /> },
+    { id: 'builds', label: 'Builds', icon: <Hammer className="w-3.5 h-3.5" /> },
+    { id: 'domains', label: 'Domains', icon: <Globe className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
+    { id: 'deployments', label: 'Deployments', icon: <ListTree className="w-3.5 h-3.5" /> },
     { id: 'advanced', label: 'Advanced', icon: <Cpu className="w-3.5 h-3.5" /> },
   ];
 
@@ -205,6 +213,22 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
           </div>
         )}
 
+        {tab === 'env' && (
+          <EnvironmentVariablesPanel projectId={projectId} appName={name} />
+        )}
+
+        {tab === 'builds' && (
+          <BuildPipelinePanel projectId={projectId} appName={name} />
+        )}
+
+        {tab === 'domains' && (
+          <CustomDomainsPanel projectId={projectId} appName={name} />
+        )}
+
+        {tab === 'logs' && (
+          <LogsViewerPanel projectId={projectId} appName={name} />
+        )}
+
         {tab === 'deployments' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -233,16 +257,6 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {tab === 'logs' && (
-          <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-slate-900">Application Logs</h3>
-              <GhostButton onClick={openLogs}><Terminal className="w-3.5 h-3.5" /> View live logs</GhostButton>
-            </div>
-            <p className="text-xs text-slate-400">Streams stdout/stderr from the running container for this application.</p>
           </div>
         )}
 

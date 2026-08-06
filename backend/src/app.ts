@@ -25,6 +25,9 @@ import { databaseRoutes } from './routes/databases.js';
 import { paymentRoutes } from './routes/payment.js';
 import { adminRoutes } from './routes/admin.js';
 import geoRoutes from './routes/geo.js';
+import { domainRoutes } from './routes/domains.js';
+import { auditRoutes } from './routes/audit.js';
+import { buildRoutes } from './routes/builds.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -64,16 +67,37 @@ export async function buildApp() {
     openapi: {
       info: {
         title: 'DigiWise Hosting API',
-        description: 'Self-hosted PaaS control plane API - deploy apps, provision databases, manage domains',
-        version: '2.0.0',
+        description: 'Self-hosted PaaS control plane — deploy apps, provision databases, manage domains, monitor infrastructure. Built on K3s + Traefik + ArgoCD + Longhorn.',
+        version: '2.1.0',
+        contact: { name: 'DigiWise Support', email: 'support@digiwisesoftech.com' },
+        license: { name: 'MIT' },
       },
-      servers: [{ url: `http://localhost:${config.port}`, description: 'Development server' }],
+      servers: [
+        { url: `http://localhost:${config.port}`, description: 'Development server' },
+        { url: 'https://api.digiwisesoftech.com', description: 'Production' },
+      ],
+      tags: [
+        { name: 'Auth', description: 'Authentication & registration' },
+        { name: 'Projects', description: 'Kubernetes namespace management' },
+        { name: 'Applications', description: 'Kubernetes deployments, services, env vars' },
+        { name: 'Builds', description: 'Kaniko build pipeline for Git-push deploys' },
+        { name: 'Databases', description: 'CloudNativePG, Percona, MySQL, Redis provisioning' },
+        { name: 'Domains', description: 'Custom domain management with TLS via cert-manager' },
+        { name: 'Audit Logs', description: 'Platform audit trail' },
+        { name: 'Plan', description: 'Subscription plans & usage metering' },
+        { name: 'Payment', description: 'Razorpay checkout & billing' },
+        { name: 'Admin', description: 'Admin-only platform management' },
+        { name: 'Config', description: 'Public configuration' },
+        { name: 'Geo', description: 'Geolocation detection' },
+        { name: 'System', description: 'Health checks' },
+      ],
       components: {
         securitySchemes: {
           bearerAuth: {
             type: 'http',
             scheme: 'bearer',
             bearerFormat: 'JWT',
+            description: 'JWT token from /auth/login or /auth/register',
           },
         },
       },
@@ -98,6 +122,9 @@ export async function buildApp() {
   await app.register(projectRoutes);
   await app.register(appRoutes);
   await app.register(databaseRoutes);
+  await app.register(domainRoutes);
+  await app.register(auditRoutes);
+  await app.register(buildRoutes);
   await app.register(adminRoutes);
   await app.register(geoRoutes);
 
@@ -107,6 +134,10 @@ export async function buildApp() {
     configuration: {
       title: 'DigiWise Hosting API',
       favicon: 'https://raw.githubusercontent.com/scalar/scalar/main/packages/docs/public/favicon.svg',
+      spec: { url: '/documentation/json' },
+      theme: 'kepler',
+      layout: 'modern',
+      defaultHttpClient: { targetKey: 'javascript', clientKey: 'fetch' },
     },
   });
 

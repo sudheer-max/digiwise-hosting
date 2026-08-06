@@ -2,8 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: digiwise-api
+  namespace: digiwise-backend
   labels:
     app: digiwise-api
+    managed-by: digiwise-hosting
 spec:
   replicas: 2
   selector:
@@ -14,21 +16,33 @@ spec:
       labels:
         app: digiwise-api
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
         - name: api
           image: harbor.digiwisesoftech.com/digiwise/digiwise-backend:latest
           ports:
             - containerPort: 4000
-          envFrom:
-            - secretRef:
-                name: backend-secrets
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: digiwise-db-credentials
+                  key: url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: digiwise-jwt-secret
+                  key: secret
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: 256Mi
+              cpu: 250m
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: 512Mi
+              cpu: 500m
           livenessProbe:
             httpGet:
               path: /health
@@ -41,11 +55,20 @@ spec:
               port: 4000
             initialDelaySeconds: 5
             periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            failureThreshold: 30
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: digiwise-api
+  namespace: digiwise-backend
+  labels:
+    app: digiwise-api
 spec:
   selector:
     app: digiwise-api
@@ -58,6 +81,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: digiwise-api-ingress
+  namespace: digiwise-backend
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
@@ -84,8 +108,27 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: digiwise-api-pdb
+  namespace: digiwise-backend
 spec:
   minAvailable: 1
   selector:
     matchLabels:
       app: digiwise-api
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: digiwise-jwt-secret
+  namespace: digiwise-backend
+type: Opaque
+stringData:
+  secret: "CHANGE_ME_TO_A_SECURE_RANDOM_STRING"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: digiwise-db-credentials
+  namespace: digiwise-backend
+type: Opaque
+stringData:
+  url: "postgresql://postgres:password@postgresql-digiwise.digiwise-databases.svc.cluster.local:5432/digiwise"

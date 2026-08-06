@@ -3,18 +3,18 @@ kind: Namespace
 metadata:
   name: digiwise-backend
   labels:
-    app.kubernetes.io/part-of: digiwise-hosting
+    managed-by: digiwise-hosting
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: digiwise-frontend
   labels:
-    app.kubernetes.io/part-of: digiwise-hosting
+    managed-by: digiwise-hosting
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: digiwise-databases
   labels:
-    app.kubernetes.io/part-of: digiwise-hosting
+    managed-by: digiwise-hosting

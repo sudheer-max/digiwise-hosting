@@ -2,8 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: digiwise-frontend
+  namespace: digiwise-frontend
   labels:
     app: digiwise-frontend
+    managed-by: digiwise-hosting
 spec:
   replicas: 2
   selector:
@@ -14,28 +16,33 @@ spec:
       labels:
         app: digiwise-frontend
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
         - name: frontend
           image: harbor.digiwisesoftech.com/digiwise/digiwise-frontend:latest
           ports:
-            - containerPort: 3000
+            - containerPort: 80
+          env:
+            - name: VITE_API_URL
+              value: https://api.digiwisesoftech.com
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: 64Mi
+              cpu: 50m
             limits:
-              memory: "256Mi"
-              cpu: "200m"
+              memory: 128Mi
+              cpu: 100m
           livenessProbe:
             httpGet:
               path: /
-              port: 3000
-            initialDelaySeconds: 30
+              port: 80
+            initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
-              port: 3000
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
 ---
@@ -43,18 +50,22 @@ apiVersion: v1
 kind: Service
 metadata:
   name: digiwise-frontend
+  namespace: digiwise-frontend
+  labels:
+    app: digiwise-frontend
 spec:
   selector:
     app: digiwise-frontend
   ports:
     - port: 80
-      targetPort: 3000
+      targetPort: 80
   type: ClusterIP
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: digiwise-frontend-ingress
+  namespace: digiwise-frontend
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
