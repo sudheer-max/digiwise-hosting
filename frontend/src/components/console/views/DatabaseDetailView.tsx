@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check } from 'lucide-react';
+import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
@@ -7,34 +7,76 @@ import {
   StatusPill, Field, FieldGrid, CopyField, Modal
 } from '../ui';
 
-const DB_INFO: Record<string, { label: string; icon: string }> = {
-  postgresql: { label: 'PostgreSQL', icon: '🐘' },
-  mongodb: { label: 'MongoDB', icon: '🍃' },
-  mysql: { label: 'MySQL', icon: '🐬' },
-  redis: { label: 'Redis', icon: '🔴' },
+const DB_INFO: Record<string, { label: string; icon: string; color: string }> = {
+  postgresql: { label: 'PostgreSQL', icon: '🐘', color: '#336791' },
+  mongodb: { label: 'MongoDB', icon: '🍃', color: '#47A248' },
+  mysql: { label: 'MySQL', icon: '🐬', color: '#4479A1' },
+  redis: { label: 'Redis', icon: '🔴', color: '#DC382D' },
 };
 
-type Tab = 'overview' | 'connect' | 'credentials' | 'logs' | 'advanced';
+type Tab = 'variables' | 'connect' | 'credentials' | 'logs' | 'advanced';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* ignore */ }
+  };
+  return (
+    <button onClick={copy} className="inline-flex items-center gap-1 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-[11px] font-bold px-2 py-1.5 transition-colors cursor-pointer shrink-0">
+      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+    </button>
+  );
+}
+
+function ConnectionField({ label, value, secret = false }: { label: string; value: string; secret?: boolean }) {
+  const [show, setShow] = useState(!secret);
+  const display = secret && !show ? '••••••••' : value;
+  return (
+    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2.5">
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{label}</div>
+        <div className="text-xs font-mono text-slate-800 truncate">{display}</div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {secret && (
+          <button onClick={() => setShow(!show)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+            {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        )}
+        <CopyButton text={value} />
+      </div>
+    </div>
+  );
+}
 
 export default function DatabaseDetailView({ type, namespace, dbName }: { type: string; namespace: string; dbName: string }) {
   const { data, navigate } = useConsole();
   const { refresh } = data;
   const info = DB_INFO[type] || DB_INFO.postgresql;
   const [db, setDb] = useState<any>(null);
+  const [vars, setVars] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('variables');
   const [busy, setBusy] = useState('');
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [activeLang, setActiveLang] = useState('nodejs');
 
   const load = useCallback(async () => {
     setError('');
     try {
-      const dbs = await api.listDatabases(namespace);
+      const [dbs, variables] = await Promise.all([
+        api.listDatabases(namespace),
+        api.getDatabaseVariables(namespace, type, dbName).catch(() => null),
+      ]);
       const found = Array.isArray(dbs) ? dbs.find((d: any) => d.name === dbName && d.type === type) : null;
       setDb(found);
+      setVars(variables);
     } catch (err: any) {
       setError(err.message || 'Failed to load database');
     } finally {
@@ -61,66 +103,74 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
 
   const openLogs = async () => {
     setLogOpen(true);
-    setLogText('Database logs are available via kubectl:\n\nkubectl logs -n ' + namespace + ' ' + (db?.podName || dbName) + '\n\nOr use: kubectl logs -f -n ' + namespace + ' -l app=' + dbName);
-  };
-
-  const copyConn = async (text: string) => {
+    setLogText('Loading logs...');
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch { /* ignore */ }
-  };
-
-  const buildSnippets = () => {
-    if (!db) return [];
-    const host = db.host || `${dbName}-rw.${namespace}.svc.cluster.local`;
-    const port = db.port || (type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379);
-    const user = db.databaseUser || 'user';
-    const pass = db.databasePassword || 'password';
-    const dbname = db.databaseName || dbName;
-    const map: Record<string, string[]> = {
-      postgresql: [
-        `postgresql://${user}:${pass}@${host}:${port}/${dbname}`,
-        `psql postgresql://${user}:${pass}@${host}:${port}/${dbname}`,
-      ],
-      mongodb: [
-        `mongodb://${user}:${pass}@${host}:${port}/${dbname}`,
-        `mongosh mongodb://${user}:${pass}@${host}:${port}/${dbname}`,
-      ],
-      mysql: [
-        `mysql://${user}:${pass}@${host}:${port}/${dbname}`,
-        `mysql -h ${host} -P ${port} -u ${user} -p${pass} ${dbname}`,
-      ],
-      redis: [
-        `redis://${pass}@${host}:${port}`,
-        `redis-cli -h ${host} -p ${port} -a ${pass}`,
-      ],
-    };
-    return map[type] || [`DATABASE_URL=${host}:${port}`];
+      const res: any = await api.getProjectLogs(namespace, dbName);
+      const logs = res?.logs || (Array.isArray(res) ? res : []);
+      setLogText(Array.isArray(logs) ? logs.map((l: any) => l.log || l.message || JSON.stringify(l)).join('\n') : String(logs || 'No logs available'));
+    } catch (err: any) {
+      setLogText(`Failed to load logs: ${err.message}`);
+    }
   };
 
   if (loading) return <Loader label={`Loading ${info.label}...`} />;
-  if (!db) return <ErrorBanner message={error || 'Database not found'} onRetry={load} />;
+  if (!db && !vars) return <ErrorBanner message={error || 'Database not found'} onRetry={load} />;
 
-  const st = (db.status || 'Running').toUpperCase();
+  const st = (db?.status || vars?.status || 'Running').toUpperCase();
+  const host = vars?.host || `${dbName}-rw.${namespace}.svc.cluster.local`;
+  const port = vars?.port || (type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379);
+  const username = vars?.username || '';
+  const password = vars?.password || '';
+  const connStr = vars?.internalConnectionString || '';
+  const extConnStr = vars?.externalConnectionString || '';
+  const portForwardCmd = vars?.portForwardCmd || `kubectl port-forward -n ${namespace} svc/${dbName}-rw ${port}:${port}`;
+  const envVars = vars?.envVars || {};
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: 'Overview', icon: <HardDrive className="w-3.5 h-3.5" /> },
+    { id: 'variables', label: 'Variables', icon: <KeyRound className="w-3.5 h-3.5" /> },
     { id: 'connect', label: 'Connect', icon: <Plug className="w-3.5 h-3.5" /> },
-    { id: 'credentials', label: 'Credentials', icon: <KeyRound className="w-3.5 h-3.5" /> },
+    { id: 'credentials', label: 'Credentials', icon: <Lock className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
     { id: 'advanced', label: 'Advanced', icon: <Database className="w-3.5 h-3.5" /> },
   ];
+
+  const snippets: Record<string, { label: string; code: string }[]> = {
+    nodejs: [
+      { label: 'Connection String', code: `DATABASE_URL="${connStr}"` },
+      { label: 'pg (PostgreSQL)', code: `const { Pool } = require('pg');\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL });` },
+      { label: 'mongoose (MongoDB)', code: `const mongoose = require('mongoose');\nawait mongoose.connect(process.env.DATABASE_URL);` },
+      { label: 'mysql2 (MySQL)', code: `const mysql = require('mysql2/promise');\nconst conn = await mysql.createConnection(process.env.DATABASE_URL);` },
+      { label: 'ioredis (Redis)', code: `const Redis = require('ioredis');\nconst redis = new Redis(process.env.REDIS_URL);` },
+    ],
+    python: [
+      { label: 'Connection String', code: `DATABASE_URL="${connStr}"` },
+      { label: 'psycopg2 (PostgreSQL)', code: `import psycopg2\nconn = psycopg2.connect("${connStr}")` },
+      { label: 'pymongo (MongoDB)', code: `from pymongo import MongoClient\nclient = MongoClient("${connStr}")` },
+      { label: 'pymysql (MySQL)', code: `import pymysql\nconn = pymysql.connect(host="${host}", port=${port}, user="${username}", password="***", database="${dbName}")` },
+      { label: 'redis-py (Redis)', code: `import redis\nr = redis.Redis.from_url("${connStr}")` },
+    ],
+    go: [
+      { label: 'Connection String', code: `DATABASE_URL="${connStr}"` },
+      { label: 'pgx (PostgreSQL)', code: `conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))` },
+      { label: 'mongo-go-driver', code: `client, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("DATABASE_URL")))` },
+    ],
+    curl: [
+      { label: 'psql', code: `psql "${connStr}"` },
+      { label: 'mongosh', code: `mongosh "${connStr}"` },
+      { label: 'mysql CLI', code: `mysql -h ${host} -P ${port} -u ${username} -p ${dbName}` },
+      { label: 'redis-cli', code: `redis-cli -h ${host} -p ${port}${password ? ` -a ${password}` : ''}` },
+    ],
+  };
 
   return (
     <div className="space-y-6">
       <SectionHeader
         title={<span className="flex items-center gap-2"><span className="text-2xl">{info.icon}</span> {dbName}</span>}
-        subtitle={<span className="font-mono">{info.label} · {namespace}</span>}
+        subtitle={<span className="font-mono" style={{ color: info.color }}>{info.label} · {namespace}</span>}
         back={() => navigate({ name: 'databases' })}
         action={
           <div className="flex items-center gap-2">
+            <GhostButton onClick={load}><RefreshCw className="w-4 h-4" /></GhostButton>
             <GhostButton danger onClick={doDelete} disabled={busy === 'delete'}>
               {busy === 'delete' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
             </GhostButton>
@@ -130,12 +180,15 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
 
       {error && <ErrorBanner message={error} />}
 
+      {/* Status banner */}
       <div className="bg-white border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span><StatusPill status={st} /></div>
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Engine</span><span className="text-xs font-mono text-slate-700">{info.label}</span></div>
-        <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Namespace</span><span className="text-xs font-mono text-slate-700">{namespace}</span></div>
+        <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Host</span><span className="text-xs font-mono text-slate-700">{host}</span></div>
+        <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Port</span><span className="text-xs font-mono text-slate-700">{port}</span></div>
       </div>
 
+      {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto no-scrollbar">
         {TABS.map((t) => (
           <button
@@ -150,107 +203,139 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
         ))}
       </div>
 
-      {tab === 'overview' && (
+      {/* Variables Tab - Railway style */}
+      {tab === 'variables' && (
         <div className="space-y-6">
+          {/* Connection String Card */}
           <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-4">General</h3>
-            <FieldGrid>
-              <Field label="Name" value={dbName} copyable={dbName} />
-              <Field label="Type" value={info.label} />
-              <Field label="Namespace" value={namespace} copyable={namespace} />
-              <Field label="Status" value={<StatusPill status={st} />} />
-              <Field label="Created At" value={db.createdAt ? new Date(db.createdAt).toLocaleString() : '—'} />
-            </FieldGrid>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <div className="w-8 h-8 flex items-center justify-center text-lg" style={{ backgroundColor: `${info.color}15` }}>{info.icon}</div>
+                Connection String
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 bg-slate-900 rounded-lg px-4 py-3">
+              <code className="flex-1 text-xs font-mono text-emerald-400 overflow-auto whitespace-pre-wrap break-all">{connStr}</code>
+              <CopyButton text={connStr} />
+            </div>
           </div>
+
+          {/* Quick Fields */}
           <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-4">Configuration</h3>
-            <FieldGrid>
-              <Field label="Database Name" value={db.databaseName || '—'} copyable={db.databaseName || ''} />
-              <Field label="Database User" value={db.databaseUser || '—'} copyable={db.databaseUser || ''} />
-              <Field label="Port" value={db.port != null ? String(db.port) : '—'} />
-              <Field label="Size" value={db.size || '—'} />
-            </FieldGrid>
+            <h3 className="text-sm font-bold text-slate-900 mb-4">Connection Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <ConnectionField label="Host" value={host} />
+              <ConnectionField label="Port" value={String(port)} />
+              <ConnectionField label="User" value={username} />
+              <ConnectionField label="Password" value={password} secret />
+              <ConnectionField label="Database" value={dbName} />
+              <ConnectionField label="Namespace" value={namespace} />
+            </div>
           </div>
-        </div>
-      )}
 
-      {tab === 'connect' && (
-        <div className="space-y-6">
+          {/* Environment Variables */}
           <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-1"><Plug className="w-4 h-4 text-[#00459c]" /> Connection Info</h3>
-            <p className="text-xs text-slate-400 mt-0.5 mb-4">
-              Connect to this database from within the Kubernetes cluster or via a port-forward.
-            </p>
-
-            <div className="space-y-5">
-              <FieldGrid cols={2}>
-                <Field label="Host (internal)" value={db.host || `${dbName}-rw.${namespace}.svc.cluster.local`} copyable={db.host || `${dbName}-rw.${namespace}.svc.cluster.local`} />
-                <Field label="Port" value={String(db.port || (type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379))} copyable={String(db.port || (type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379))} />
-              </FieldGrid>
-
-              <div className="bg-amber-50 border border-amber-200 px-4 py-3">
-                <div className="text-xs font-bold text-amber-700 mb-0.5">Kubernetes Service Access</div>
-                <div className="text-[11px] text-amber-600">
-                  This database is accessible within the cluster at <code className="font-mono bg-amber-100 px-1">{db.host || `${dbName}-rw.${namespace}.svc.cluster.local`}</code>.
-                  To access from outside, use <code className="font-mono bg-amber-100 px-1">kubectl port-forward</code>.
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[#00459c]" /> Environment Variables
+              </h3>
+              <CopyButton text={Object.entries(envVars).map(([k, v]) => `${k}=${v}`).join('\n')} />
+            </div>
+            <div className="bg-slate-950 rounded-lg p-4 font-mono text-[11px] space-y-1 overflow-auto max-h-64">
+              {Object.entries(envVars).map(([k, v]) => (
+                <div key={k} className="flex">
+                  <span className="text-emerald-400">{k}</span>
+                  <span className="text-slate-500">=</span>
+                  <span className="text-amber-300 break-all">{String(v).includes('PASSWORD') || k.includes('PASSWORD') || k.includes('SECRET') ? '••••••••' : String(v)}</span>
                 </div>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 px-4 py-3">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Port Forward Command</div>
-                <code className="text-xs font-mono text-slate-700 break-all">
-                  kubectl port-forward -n {namespace} svc/{dbName}-rw {db.port || (type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379)}:{db.port || (type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379)}
-                </code>
-              </div>
-
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Connection Snippets</div>
-                <div className="space-y-2">
-                  {buildSnippets().map((s, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <pre className="flex-1 bg-slate-50 border border-slate-200 px-3 py-2.5 text-[11px] font-mono text-slate-700 overflow-auto">{s}</pre>
-                      <button
-                        onClick={() => copyConn(s)}
-                        className="inline-flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-[11px] font-bold px-2.5 py-2 transition-colors cursor-pointer shrink-0"
-                      >
-                        {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
+      {/* Connect Tab */}
+      {tab === 'connect' && (
+        <div className="space-y-6">
+          {/* Language Selector */}
+          <div className="flex items-center gap-1 bg-white border border-slate-200 shadow-sm p-1">
+            {[
+              { id: 'nodejs', label: 'Node.js' },
+              { id: 'python', label: 'Python' },
+              { id: 'go', label: 'Go' },
+              { id: 'curl', label: 'CLI' },
+            ].map((lang) => (
+              <button
+                key={lang.id}
+                onClick={() => setActiveLang(lang.id)}
+                className={`flex-1 px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                  activeLang === lang.id ? 'bg-[#00459c] text-white' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {lang.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Code Snippets */}
+          <div className="bg-white border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-bold text-slate-900 mb-4">Quick Start</h3>
+            <div className="space-y-4">
+              {(snippets[activeLang] || []).map((s, i) => (
+                <div key={i}>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{s.label}</div>
+                  <div className="flex items-start gap-2">
+                    <pre className="flex-1 bg-slate-950 text-emerald-400 px-3 py-2.5 text-[11px] font-mono overflow-auto rounded-lg">{s.code}</pre>
+                    <CopyButton text={s.code} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Port Forward */}
+          <div className="bg-white border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-[#00459c]" /> External Access
+            </h3>
+            <p className="text-xs text-slate-500 mb-3">Use port-forward to access this database from your local machine:</p>
+            <div className="flex items-start gap-2">
+              <code className="flex-1 bg-slate-50 border border-slate-200 px-3 py-2.5 text-[11px] font-mono text-slate-700 break-all">{portForwardCmd}</code>
+              <CopyButton text={portForwardCmd} />
+            </div>
+            <div className="mt-3 text-[11px] text-slate-500">
+              Then connect to <code className="bg-slate-100 px-1">localhost:{port}</code>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credentials Tab */}
       {tab === 'credentials' && (
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-4">Connection Details</h3>
-            <FieldGrid>
-              <Field label="Database User" copyable={db.databaseUser || ''} />
-              <Field label="Database Password" copyable={db.databasePassword || ''} />
-              <Field label="Database Name" copyable={db.databaseName || ''} />
-              <Field label="Port" copyable={db.port != null ? String(db.port) : ''} />
-            </FieldGrid>
-            <div className="mt-4 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2">
+            <h3 className="text-sm font-bold text-slate-900 mb-4">Database Credentials</h3>
+            <div className="space-y-3">
+              <ConnectionField label="Username" value={username} />
+              <ConnectionField label="Password" value={password} secret />
+              <ConnectionField label="Database Name" value={dbName} />
+            </div>
+            <div className="mt-4 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2">
               Store these credentials securely. The password is stored in a Kubernetes Secret.
             </div>
           </div>
+
           <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-3">Environment Variables (auto-injected)</h3>
-            <div className="bg-slate-50 border border-slate-200 p-4 font-mono text-[11px] text-slate-700 space-y-1 overflow-auto">
-              <div>DATABASE_URL=...</div>
-              <div>DATABASE_USER={db.databaseUser || ''}</div>
-              <div>DATABASE_PASSWORD=••••••</div>
-              <div>DATABASE_NAME={db.databaseName || ''}</div>
-              <div>DATABASE_PORT={db.port || ''}</div>
+            <h3 className="text-sm font-bold text-slate-900 mb-3">Connection URLs</h3>
+            <div className="space-y-3">
+              <ConnectionField label="Internal URL" value={connStr} />
+              <ConnectionField label="External URL (via port-forward)" value={extConnStr} />
             </div>
           </div>
         </div>
       )}
 
+      {/* Logs Tab */}
       {tab === 'logs' && (
         <div className="bg-white border border-slate-200 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
@@ -261,6 +346,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
         </div>
       )}
 
+      {/* Advanced Tab */}
       {tab === 'advanced' && (
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 shadow-sm p-5">
@@ -272,11 +358,11 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
             </div>
           </div>
           <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-3">Raw Database</h3>
+            <h3 className="text-sm font-bold text-slate-900 mb-3">Raw Data</h3>
             <details>
               <summary className="text-xs font-bold text-[#00459c] cursor-pointer hover:underline">Show full JSON payload</summary>
               <pre className="mt-3 bg-slate-50 border border-slate-200 p-3 text-[10px] font-mono text-slate-600 overflow-auto max-h-96">
-                {JSON.stringify(db, null, 2)}
+                {JSON.stringify({ db, variables: vars }, null, 2)}
               </pre>
             </details>
           </div>

@@ -129,6 +129,14 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Image</span><span className="text-xs font-mono text-slate-700">{app.image || '—'}</span></div>
         {replicas != null && <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Replicas</span><span className="text-xs font-bold text-slate-700">{replicas}</span></div>}
         {app.port != null && <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Port</span><span className="text-xs font-mono text-slate-700">{app.port}</span></div>}
+        {app.externalUrl && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">URL</span>
+            <a href={app.externalUrl} target="_blank" rel="noopener" className="text-xs font-mono text-[#00459c] hover:underline flex items-center gap-1">
+              {app.externalUrl} <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

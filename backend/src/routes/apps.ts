@@ -2,6 +2,9 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '../db/client.js';
 import * as k8s from '../services/kubernetes.js';
 import { assertProjectOwned, OwnershipError } from '../services/ownership.js';
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export async function appRoutes(app: FastifyInstance) {
   // Create a new application (deployment + service)
@@ -399,4 +402,261 @@ export async function appRoutes(app: FastifyInstance) {
       return reply.status(500).send({ error: err.message });
     }
   });
+
+  // Deploy from GitHub repository
+  app.post<{ Params: { projectId: string }; Body: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> } }>('/api/projects/:projectId/apps/deploy-github', {
+    schema: {
+      tags: ['Applications'],
+      description: 'Deploy an application from a GitHub repository',
+      params: { type: 'object', properties: { projectId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['name', 'repoURL', 'port'],
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 63 },
+          repoURL: { type: 'string' },
+          branch: { type: 'string', default: 'main' },
+          buildCommand: { type: 'string' },
+          startCommand: { type: 'string' },
+          port: { type: 'number', minimum: 1, maximum: 65535 },
+          env: { type: 'object', additionalProperties: { type: 'string' } },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { projectId } = request.params;
+    const { name, repoURL, branch = 'main', buildCommand, startCommand, port, env } = request.body;
+
+    const project = await prisma.project.findFirst({
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    try {
+      // Clone the repo to a temp directory
+      const tmpDir = `/tmp/build-${Date.now()}`;
+      execSync(`git clone --depth 1 -b ${branch} ${repoURL} ${tmpDir}`, { timeout: 60000 });
+
+      // Build Docker image
+      const dockerfile = generateDockerfile(tmpDir, buildCommand, startCommand);
+      fs.writeFileSync(path.join(tmpDir, 'Dockerfile'), dockerfile);
+
+      const imageTag = `digiwise/${name}:latest`;
+      execSync(`docker build -t ${imageTag} ${tmpDir}`, { timeout: 300000, cwd: tmpDir });
+
+      // Import into K3s containerd
+      const tarPath = `/tmp/${name}.tar`;
+      execSync(`docker save ${imageTag} -o ${tarPath}`, { timeout: 120000 });
+      execSync(`k3s ctr images import ${tarPath}`, { timeout: 120000 });
+      execSync(`rm -f ${tarPath}`);
+
+      // Cleanup temp dir
+      execSync(`rm -rf ${tmpDir}`);
+
+      // Create K8s deployment
+      await k8s.createDeployment(
+        project.k8sNamespace,
+        name,
+        imageTag,
+        port,
+        env,
+        1
+      );
+
+      // Create K8s service
+      await k8s.createService(
+        project.k8sNamespace,
+        name,
+        port,
+        port
+      );
+
+      // Create IngressRoute for external access
+      const ingressHost = `${name}.${project.k8sNamespace}.digiwisesoftech.com`;
+      try {
+        await k8s.createIngressRoute(
+          project.k8sNamespace,
+          name,
+          ingressHost,
+          port
+        );
+      } catch { /* ingress creation is optional */ }
+
+      return reply.status(201).send({
+        success: true,
+        name,
+        repoURL,
+        branch,
+        port,
+        externalUrl: `https://${ingressHost}`,
+        message: 'Application deployed from GitHub successfully',
+      });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message || 'Failed to deploy from GitHub' });
+    }
+  });
+
+  // Get application environment variables
+  app.get<{ Params: { projectId: string; name: string } }>('/api/projects/:projectId/apps/:name/variables', {
+    schema: {
+      tags: ['Applications'],
+      description: 'Get application environment variables',
+      params: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string' },
+          name: { type: 'string' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { projectId, name } = request.params;
+
+    const project = await prisma.project.findFirst({
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    try {
+      // Get deployment to find env vars
+      const deployments = await k8s.listDeployments(project.k8sNamespace);
+      const deployment = deployments.find(d => d.name === name);
+
+      if (!deployment) {
+        return reply.status(404).send({ error: 'Application not found' });
+      }
+
+      // Get full deployment details from K8s
+      const result = await k8s.k8sAppsApi.readNamespacedDeployment({ name, namespace: project.k8sNamespace });
+      const containers = result.spec?.template?.spec?.containers || [];
+      const envVars: Record<string, string> = {};
+
+      for (const container of containers) {
+        if (container.name === name && container.env) {
+          for (const envVar of container.env) {
+            if (envVar.name && envVar.value) {
+              envVars[envVar.name] = envVar.value;
+            }
+          }
+        }
+      }
+
+      return { envVars };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+}
+
+// Generate a basic Dockerfile for common Node.js/Python apps
+function generateDockerfile(repoDir: string, buildCommand?: string, startCommand?: string): string {
+  // Check if package.json exists (Node.js)
+  if (fs.existsSync(path.join(repoDir, 'package.json'))) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoDir, 'package.json'), 'utf-8'));
+    const isNext = !!pkg.dependencies?.next;
+    const isVite = !!pkg.dependencies?.vite;
+
+    if (isNext) {
+      return `FROM node:22-slim AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM node:22-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+EXPOSE 3000
+CMD ["npx", "next", "start", "-p", "3000"]
+`;
+    }
+
+    if (isVite) {
+      return `FROM node:22-slim AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM node:22-slim
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=builder /app/dist ./dist
+EXPOSE 3000
+CMD ["serve", "-s", "dist", "-l", "3000"]
+`;
+    }
+
+    return `FROM node:22-slim
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+${buildCommand ? `RUN ${buildCommand}` : ''}
+EXPOSE 3000
+CMD ${startCommand ? `["sh", "-c", "${startCommand}"]` : '["node", "index.js"]'}
+`;
+  }
+
+  // Check if requirements.txt exists (Python)
+  if (fs.existsSync(path.join(repoDir, 'requirements.txt'))) {
+    return `FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+${buildCommand ? `RUN ${buildCommand}` : ''}
+EXPOSE 3000
+CMD ${startCommand ? `["sh", "-c", "${startCommand}"]` : '["python", "app.py"]'}
+`;
+  }
+
+  // Check if go.mod exists (Go)
+  if (fs.existsSync(path.join(repoDir, 'go.mod'))) {
+    return `FROM golang:1.22 AS builder
+WORKDIR /app
+COPY go.mod go.sum* ./
+RUN go mod download
+COPY . .
+${buildCommand ? `RUN ${buildCommand}` : 'RUN CGO_ENABLED=0 go build -o main .'}
+RUN go build -o main .
+
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/main .
+EXPOSE 3000
+CMD ["./main"]
+`;
+  }
+
+  // Default: static file server
+  return `FROM node:22-slim
+WORKDIR /app
+COPY . .
+RUN npm install -g serve
+EXPOSE 3000
+CMD ["serve", "-s", ".", "-l", "3000"]
+`;
 }

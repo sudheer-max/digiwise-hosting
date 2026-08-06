@@ -331,3 +331,92 @@ export async function isKubernetesAvailable(): Promise<boolean> {
 export const k8sCoreApi = coreApi;
 export const k8sAppsApi = appsApi;
 export const k8sCustomApi = kc.makeApiClient(k8s.CustomObjectsApi);
+
+// Create Traefik IngressRoute for external access
+export async function createIngressRoute(
+  namespace: string,
+  name: string,
+  host: string,
+  servicePort: number,
+  tlsSecretName?: string
+): Promise<void> {
+  const ingressRoute = {
+    apiVersion: 'traefik.io/v1alpha1',
+    kind: 'IngressRoute',
+    metadata: {
+      name: `${name}-ingress`,
+      namespace,
+      labels: { app: name, 'managed-by': 'digiwise-hosting' },
+    },
+    spec: {
+      entryPoints: ['websecure'],
+      routes: [
+        {
+          match: `Host(\`${host}\`)`,
+          kind: 'Rule',
+          services: [
+            {
+              name: name,
+              port: servicePort,
+            },
+          ],
+        },
+      ],
+      tls: tlsSecretName ? { secretName: tlsSecretName } : undefined,
+    },
+  };
+
+  try {
+    // Try to create, if exists update
+    await k8sCustomApi.createNamespacedCustomObject({
+      group: 'traefik.io',
+      version: 'v1alpha1',
+      namespace,
+      plural: 'ingressroutes',
+      body: ingressRoute,
+    });
+  } catch (err: any) {
+    if (err?.body?.reason === 'AlreadyExists') {
+      await k8sCustomApi.replaceNamespacedCustomObject({
+        group: 'traefik.io',
+        version: 'v1alpha1',
+        namespace,
+        plural: 'ingressroutes',
+        name: `${name}-ingress`,
+        body: ingressRoute,
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
+// Delete Traefik IngressRoute
+export async function deleteIngressRoute(namespace: string, name: string): Promise<void> {
+  try {
+    await k8sCustomApi.deleteNamespacedCustomObject({
+      group: 'traefik.io',
+      version: 'v1alpha1',
+      namespace,
+      plural: 'ingressroutes',
+      name: `${name}-ingress`,
+    });
+  } catch { /* ignore if not found */ }
+}
+
+// Execute a command in a container (for building Docker images)
+export async function execInPod(namespace: string, podName: string, containerName: string, command: string[]): Promise<string> {
+  try {
+    const exec = new k8s.Exec(kc);
+    const stream = await exec.exec(namespace, podName, containerName, command, coreApi, 10000);
+    let output = '';
+    stream.on('data', (data: Buffer) => { output += data.toString(); });
+    stream.on('error', (err: Error) => { output += `ERROR: ${err.message}`; });
+    return new Promise((resolve) => {
+      stream.on('close', () => resolve(output));
+      setTimeout(() => { stream.close(); resolve(output); }, 300000);
+    });
+  } catch (err: any) {
+    throw new Error(`Exec failed: ${err.message}`);
+  }
+}

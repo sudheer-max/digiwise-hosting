@@ -284,6 +284,23 @@ class ApiClient {
     });
   }
 
+  getDatabaseVariables(namespace: string, type: string, name: string) {
+    return this.request(`/databases/${namespace}/${type}/${name}/variables`);
+  }
+
+  // === GITHUB DEPLOY ===
+
+  deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> }) {
+    return this.request(`/projects/${projectId}/apps/deploy-github`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  getAppVariables(projectId: string, name: string) {
+    return this.request(`/projects/${projectId}/apps/${name}/variables`);
+  }
+
   // === MONITORING (via proxy) ===
 
   getGrafanaUrl() {

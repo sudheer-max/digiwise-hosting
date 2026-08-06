@@ -51,8 +51,9 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
 
   // Step 3: config — github
   const [repoURL, setRepoURL] = useState('');
-  const [repoPath, setRepoPath] = useState('');
-  const [targetRevision, setTargetRevision] = useState('HEAD');
+  const [branch, setBranch] = useState('main');
+  const [buildCommand, setBuildCommand] = useState('');
+  const [startCommand, setStartCommand] = useState('');
 
   // Step 3: config — database
   const [dbType, setDbType] = useState<string>('postgresql');
@@ -109,7 +110,6 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
     setBusy(true);
     try {
       let projectId = selectedProjectId;
-      let namespace = selectedProject?.k8sNamespace || '';
 
       if (createNewProject) {
         const res: any = await api.createProject({
@@ -118,7 +118,6 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
         });
         const created = res?.project || res;
         projectId = created?.id || created?.project?.id;
-        namespace = created?.k8sNamespace || created?.project?.k8sNamespace || newProjectName.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
         if (!projectId) throw new Error('Failed to create project — no ID returned');
       }
 
@@ -138,11 +137,18 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
         setResult(app);
         if (onCreated) onCreated(app?.name || app?.id || appName);
       } else if (appType === 'github') {
-        const res: any = await api.deployToProject(projectId, {
+        const env: Record<string, string> = {};
+        for (const e of envVars) {
+          if (e.key.trim()) env[e.key.trim()] = e.value;
+        }
+        const res: any = await api.deployFromGitHub(projectId, {
           name: appName.trim(),
           repoURL: repoURL.trim(),
-          path: repoPath.trim() || '.',
-          targetRevision: targetRevision.trim() || 'HEAD',
+          branch: branch.trim() || 'main',
+          buildCommand: buildCommand.trim() || undefined,
+          startCommand: startCommand.trim() || undefined,
+          port,
+          ...(Object.keys(env).length > 0 ? { env } : {}),
         });
         setResult(res);
         if (onCreated) onCreated(appName);
@@ -150,7 +156,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
         const res: any = await api.createDatabase({
           type: dbType,
           name: dbName.trim(),
-          namespace,
+          namespace: selectedProject?.k8sNamespace || newProjectName.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-'),
         });
         const db = res?.database || res;
         setResult(db);
@@ -193,7 +199,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
 
       {error && <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3">{error}</div>}
 
-      {/* ── Step 1: Project ── */}
+      {/* Step 1: Project */}
       {step === 1 && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
@@ -221,13 +227,13 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
                   type="text"
                   value={projectSearch}
                   onChange={(e) => setProjectSearch(e.target.value)}
-                  placeholder="Search projects…"
+                  placeholder="Search projects..."
                   className="w-full border border-slate-200 bg-slate-50 pl-9 pr-3 py-2.5 text-sm outline-none focus:border-[#00459c]"
                 />
               </div>
               {filteredProjects.length === 0 && (
                 <div className="text-xs text-slate-400 bg-slate-50 border border-slate-200 px-4 py-6 text-center">
-                  {projects.length === 0 ? 'No projects yet — create one to get started.' : 'No matching projects.'}
+                  {projects.length === 0 ? 'No projects yet - create one to get started.' : 'No matching projects.'}
                 </div>
               )}
               <div className="space-y-1 max-h-60 overflow-y-auto">
@@ -274,7 +280,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
         </div>
       )}
 
-      {/* ── Step 2: App Type ── */}
+      {/* Step 2: App Type */}
       {step === 2 && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -294,7 +300,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
             >
               <Github className="w-8 h-8" />
               <span className="uppercase tracking-wider">GitHub Repo</span>
-              <span className="text-[10px] font-normal text-slate-400 normal-case">Deploy Kubernetes manifests via ArgoCD</span>
+              <span className="text-[10px] font-normal text-slate-400 normal-case">Auto-build & deploy from source</span>
             </button>
             <button
               type="button"
@@ -316,7 +322,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
         </div>
       )}
 
-      {/* ── Step 3: Configure ── */}
+      {/* Step 3: Configure */}
       {step === 3 && (
         <div className="space-y-4">
           {appType === 'web' && (
@@ -390,7 +396,108 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
                         placeholder="value"
                         className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
                       />
-                      <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">✕</button>
+                      <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">x</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {appType === 'github' && (
+            <>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">App Name *</label>
+                <input
+                  type="text"
+                  value={appName}
+                  onChange={(e) => onAppNameChange(e.target.value)}
+                  placeholder="my-app"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">GitHub Repository URL *</label>
+                <input
+                  type="text"
+                  value={repoURL}
+                  onChange={(e) => setRepoURL(e.target.value)}
+                  placeholder="https://github.com/username/repo.git"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Supports Node.js, Python, Go, and static sites. Auto-detects framework.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Branch</label>
+                  <input
+                    type="text"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Port</label>
+                  <input
+                    type="number"
+                    value={port}
+                    onChange={(e) => setPort(Number(e.target.value) || 3000)}
+                    min={1}
+                    max={65535}
+                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Build Command (optional)</label>
+                  <input
+                    type="text"
+                    value={buildCommand}
+                    onChange={(e) => setBuildCommand(e.target.value)}
+                    placeholder="npm run build"
+                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Start Command (optional)</label>
+                  <input
+                    type="text"
+                    value={startCommand}
+                    onChange={(e) => setStartCommand(e.target.value)}
+                    placeholder="npm start"
+                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Environment Variables</label>
+                  <GhostButton onClick={addEnvVar} className="!px-2 !py-1 text-[10px]"><Plus className="w-3 h-3" /> Add</GhostButton>
+                </div>
+                {envVars.length === 0 && (
+                  <div className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2">No env vars configured.</div>
+                )}
+                <div className="space-y-2">
+                  {envVars.map((e, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                      <input
+                        type="text"
+                        value={e.key}
+                        onChange={(ev) => updateEnvVar(i, 'key', ev.target.value)}
+                        placeholder="KEY"
+                        className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={e.value}
+                        onChange={(ev) => updateEnvVar(i, 'value', ev.target.value)}
+                        placeholder="value"
+                        className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
+                      />
+                      <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">x</button>
                     </div>
                   ))}
                 </div>
@@ -402,7 +509,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
             <>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Database Type *</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {DB_TYPES.map((t) => (
                     <button
                       key={t}
@@ -431,7 +538,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
         </div>
       )}
 
-      {/* ── Step 4: Review & Deploy ── */}
+      {/* Step 4: Review & Deploy */}
       {step === 4 && (
         <div className="space-y-4">
           <div className="bg-slate-50 border border-slate-200 divide-y divide-slate-200 text-xs">
@@ -457,20 +564,6 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
                   <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Port</span>
                   <span className="font-mono text-slate-700">{port}</span>
                 </div>
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Replicas</span>
-                  <span className="font-mono text-slate-700">{replicas}</span>
-                </div>
-                {envVars.filter((e) => e.key.trim()).length > 0 && (
-                  <div className="px-4 py-2.5">
-                    <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] block mb-1">Env Vars</span>
-                    <div className="space-y-0.5">
-                      {envVars.filter((e) => e.key.trim()).map((e, i) => (
-                        <div key={i} className="font-mono text-slate-600">{e.key}={e.value}</div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </>
             )}
             {appType === 'github' && (
@@ -484,74 +577,37 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
                   <span className="font-mono text-slate-700 truncate max-w-[60%]">{repoURL}</span>
                 </div>
                 <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Path</span>
-                  <span className="font-mono text-slate-700">{repoPath.trim() || '.'}</span>
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Branch</span>
+                  <span className="font-mono text-slate-700">{branch}</span>
                 </div>
                 <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Branch</span>
-                  <span className="font-mono text-slate-700">{targetRevision || 'HEAD'}</span>
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Port</span>
+                  <span className="font-mono text-slate-700">{port}</span>
                 </div>
               </>
             )}
-          {appType === 'github' && (
-            <>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">App Name *</label>
-                <input
-                  type="text"
-                  value={appName}
-                  onChange={(e) => onAppNameChange(e.target.value)}
-                  placeholder="my-app"
-                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">GitHub Repository URL *</label>
-                <input
-                  type="text"
-                  value={repoURL}
-                  onChange={(e) => setRepoURL(e.target.value)}
-                  placeholder="https://github.com/your-org/your-repo.git"
-                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">Must contain Kubernetes manifests (Deployment, Service, etc.). For private repos, add credentials in ArgoCD first.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Manifest Path</label>
-                  <input
-                    type="text"
-                    value={repoPath}
-                    onChange={(e) => setRepoPath(e.target.value)}
-                    placeholder=". (default repo root)"
-                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
-                  />
+            {appType === 'database' && (
+              <>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Database</span>
+                  <span className="font-mono text-slate-700">{DB_LABELS[dbType]}</span>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Branch / Revision</label>
-                  <input
-                    type="text"
-                    value={targetRevision}
-                    onChange={(e) => setTargetRevision(e.target.value)}
-                    placeholder="HEAD"
-                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
-                  />
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Instance</span>
+                  <span className="font-mono text-slate-700">{dbName}</span>
                 </div>
-              </div>
-            </>
-          )}
-
-          {appType === 'database' && (
-              <div className="flex items-center justify-between px-4 py-2.5">
-                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Instance</span>
-                <span className="font-mono text-slate-700">{dbName}</span>
-              </div>
+              </>
             )}
           </div>
 
           {result && (
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-4 py-3">
-              {appType === 'web' ? 'Application' : appType === 'github' ? 'GitHub application' : 'Database'} created successfully.
+              {appType === 'web' ? 'Application' : appType === 'github' ? 'Application deployed from GitHub' : 'Database'} created successfully.
+              {result.externalUrl && (
+                <span className="ml-2">
+                  <a href={result.externalUrl} target="_blank" rel="noopener" className="underline">Open URL</a>
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -566,7 +622,7 @@ export default function CreateApplicationWizard({ onClose, onCreated }: {
           <PrimaryButton onClick={next} disabled={!canNext}>Next <ArrowRight className="w-4 h-4" /></PrimaryButton>
         ) : (
           <PrimaryButton onClick={create} disabled={busy || !!result}>
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />} {busy ? 'Creating…' : 'Create & Deploy'}
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />} {busy ? 'Creating...' : 'Create & Deploy'}
           </PrimaryButton>
         )}
       </div>

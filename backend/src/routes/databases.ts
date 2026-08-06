@@ -200,6 +200,42 @@ export async function databaseRoutes(app: FastifyInstance) {
     return databases;
   });
 
+  // Get database connection variables (Railway-style)
+  app.get<{ Params: { namespace: string; type: string; name: string } }>('/api/databases/:namespace/:type/:name/variables', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Get database connection variables, host, port, credentials, connection strings',
+      params: {
+        type: 'object',
+        properties: {
+          namespace: { type: 'string' },
+          type: { type: 'string' },
+          name: { type: 'string' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { namespace, type, name } = request.params;
+
+    const project = user.role === 'admin'
+      ? await prisma.project.findFirst({ where: { k8sNamespace: namespace } })
+      : await prisma.project.findFirst({ where: { k8sNamespace: namespace, userId: user.id } });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project namespace not found' });
+    }
+
+    try {
+      const variables = await getDatabaseVariables(namespace, type, name);
+      return variables;
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
   // Delete a database instance
   app.delete<{ Params: { namespace: string; type: string; name: string } }>('/api/databases/:namespace/:type/:name', {
     schema: {
@@ -463,5 +499,146 @@ async function createRedisInstance(namespace: string, name: string, resources: {
     plural: 'redisfailovers',
     body: redisCRD,
   });
+}
+
+// Helper: Get database connection variables from K8s secrets and services
+async function getDatabaseVariables(namespace: string, type: string, name: string) {
+  let host = '';
+  let port = 0;
+  let username = '';
+  let password = '';
+  let databaseName = name;
+  let externalHost = '';
+  let externalPort = 0;
+
+  const defaults: Record<string, { port: number; user: string }> = {
+    postgresql: { port: 5432, user: 'postgres' },
+    mongodb: { port: 27017, user: 'mongodb' },
+    mysql: { port: 3306, user: 'root' },
+    redis: { port: 6379, user: 'default' },
+  };
+
+  const def = defaults[type] || defaults.postgresql;
+
+  try {
+    if (type === 'postgresql') {
+      // CloudNativePG stores credentials in {name}-app secret
+      const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-app`, namespace });
+      const data = secret.data || {};
+      username = Buffer.from(data['username'] || '').toString('base64') || 'postgres';
+      password = Buffer.from(data['password'] || '').toString('base64') || '';
+      databaseName = Buffer.from(data['db-name'] || '').toString('base64') || name;
+      host = `${name}-rw.${namespace}.svc.cluster.local`;
+      port = def.port;
+    } else if (type === 'mongodb') {
+      // Percona stores credentials in {name}-cluster-admin-{name} secret
+      try {
+        const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-cluster-admin-${name}`, namespace });
+        const data = secret.data || {};
+        username = Buffer.from(data['MONGODB_BACKUP_USER'] || data['MONGODB_USER'] || '').toString('base64') || 'mongodb';
+        password = Buffer.from(data['MONGODB_BACKUP_PASSWORD'] || data['MONGODB_PASSWORD'] || '').toString('base64') || '';
+      } catch {
+        // Fallback: try Percona secrets
+        try {
+          const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-secrets`, namespace });
+          const data = secret.data || {};
+          username = Buffer.from(data['MONGODB_BACKUP_USER'] || '').toString('base64') || 'mongodb';
+          password = Buffer.from(data['MONGODB_BACKUP_PASSWORD'] || '').toString('base64') || '';
+        } catch { /* use defaults */ }
+      }
+      host = `${name}-rs0.${namespace}.svc.cluster.local`;
+      port = def.port;
+    } else if (type === 'mysql') {
+      // MySQL Operator stores credentials in {name}-secret
+      const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-secret`, namespace });
+      const data = secret.data || {};
+      username = Buffer.from(data['rootUser'] || '').toString('base64') || 'root';
+      password = Buffer.from(data['rootPassword'] || '').toString('base64') || '';
+      host = `${name}-router.${namespace}.svc.cluster.local`;
+      port = def.port;
+    } else if (type === 'redis') {
+      // Spotahome Redis stores auth in {name}-auth secret (if configured)
+      try {
+        const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-auth`, namespace });
+        const data = secret.data || {};
+        password = Buffer.from(data['password'] || '').toString('base64') || '';
+      } catch { /* no auth */ }
+      username = def.user;
+      host = `${name}.${namespace}.svc.cluster.local`;
+      port = def.port;
+    }
+  } catch {
+    // Use defaults if secrets not found
+    host = `${name}-rw.${namespace}.svc.cluster.local`;
+    port = def.port;
+    username = def.user;
+  }
+
+  // Build connection strings
+  const internalConnectionString = buildConnectionString(type, host, port, username, password, databaseName);
+
+  // External access via port-forward command
+  const portForwardCmd = `kubectl port-forward -n ${namespace} svc/${type === 'postgresql' ? name + '-rw' : type === 'mongodb' ? name + '-rs0' : type === 'mysql' ? name + '-router' : name} ${port}:${port}`;
+  const externalConnectionString = buildConnectionString(type, 'localhost', port, username, password, databaseName);
+
+  // Environment variables
+  const envVars: Record<string, string> = {};
+  if (type === 'postgresql') {
+    envVars['DATABASE_URL'] = internalConnectionString;
+    envVars['POSTGRES_HOST'] = host;
+    envVars['POSTGRES_PORT'] = String(port);
+    envVars['POSTGRES_USER'] = username;
+    envVars['POSTGRES_PASSWORD'] = password;
+    envVars['POSTGRES_DB'] = databaseName;
+  } else if (type === 'mongodb') {
+    envVars['DATABASE_URL'] = internalConnectionString;
+    envVars['MONGODB_HOST'] = host;
+    envVars['MONGODB_PORT'] = String(port);
+    envVars['MONGODB_USER'] = username;
+    envVars['MONGODB_PASSWORD'] = password;
+    envVars['MONGODB_DB'] = databaseName;
+  } else if (type === 'mysql') {
+    envVars['DATABASE_URL'] = internalConnectionString;
+    envVars['MYSQL_HOST'] = host;
+    envVars['MYSQL_PORT'] = String(port);
+    envVars['MYSQL_USER'] = username;
+    envVars['MYSQL_PASSWORD'] = password;
+    envVars['MYSQL_DATABASE'] = databaseName;
+  } else if (type === 'redis') {
+    envVars['REDIS_URL'] = internalConnectionString;
+    envVars['REDIS_HOST'] = host;
+    envVars['REDIS_PORT'] = String(port);
+    envVars['REDIS_PASSWORD'] = password;
+  }
+
+  return {
+    type,
+    name,
+    namespace,
+    host,
+    port,
+    username,
+    password,
+    databaseName,
+    internalConnectionString,
+    externalConnectionString,
+    portForwardCmd,
+    envVars,
+  };
+}
+
+function buildConnectionString(type: string, host: string, port: number, user: string, pass: string, db: string): string {
+  switch (type) {
+    case 'postgresql':
+      return `postgresql://${user}:${pass}@${host}:${port}/${db}?sslmode=disable`;
+    case 'mongodb':
+      return `mongodb://${user}:${pass}@${host}:${port}/${db}?authSource=admin`;
+    case 'mysql':
+      return `mysql://${user}:${pass}@${host}:${port}/${db}`;
+    case 'redis':
+      return pass ? `redis://:${pass}@${host}:${port}` : `redis://${host}:${port}`;
+    default:
+      return `${host}:${port}`;
+  }
 }
 
