@@ -125,9 +125,6 @@ export default function DigiWiseHeader({ cartCount = 0, onNavigate }: HeaderProp
             className="flex items-center gap-2.5 cursor-pointer"
           >
             <img src="/DIGIWISE-SOFTECH-LOGO.png" alt="DigiWise Logo" className="h-8 w-auto" />
-            <span className="text-xl font-bold text-slate-900 tracking-tight font-display">
-              DigiWise<span className="text-[#00459c]">.</span>
-            </span>
           </Link>
 
           {/* Desktop Nav - empty on desktop, links moved to hamburger */}

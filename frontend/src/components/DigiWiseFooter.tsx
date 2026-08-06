@@ -46,9 +46,6 @@ export default function DigiWiseFooter() {
           <div className="md:col-span-4 flex flex-col gap-4">
             <Link href="/" className="flex items-center gap-2.5 cursor-pointer">
               <img src="/DIGIWISE-SOFTECH-LOGO.png" alt="DigiWise Logo" className="h-8 w-auto" />
-              <span className="text-xl font-bold text-slate-900 tracking-tight font-display">
-                DigiWise<span className="text-[#00459c]">.</span>
-              </span>
             </Link>
             <p className="text-xs leading-relaxed max-w-sm">
               Managed Kubernetes platform with K3s, Traefik, ArgoCD and Longhorn. Deploy apps, databases and sites on a production-grade cluster.
