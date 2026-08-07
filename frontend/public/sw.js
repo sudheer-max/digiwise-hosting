@@ -1,4 +1,4 @@
-const CACHE_NAME = 'digiwise-v2';
+const CACHE_NAME = 'digiwise-v3';
 const STATIC_ASSETS = [
   '/favicon.png',
   '/DIGIWISE-SOFTECH-LOGO.png',
@@ -18,7 +18,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((name) => caches.delete(name))
+        cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
       );
     })
   );
@@ -31,14 +31,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   if (url.pathname.startsWith('/api') || url.pathname.startsWith('/auth') || url.pathname.startsWith('/admin')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Offline' }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      })
-    );
+    event.respondWith(fetch(event.request));
     return;
   }
 
