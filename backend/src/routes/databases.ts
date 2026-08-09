@@ -1,6 +1,7 @@
 ﻿import { FastifyInstance } from 'fastify';
 import { prisma } from '../db/client.js';
 import * as k8s from '../services/kubernetes.js';
+import { execSync } from 'child_process';
 
 export async function databaseRoutes(app: FastifyInstance) {
   // List database namespaces (PostgreSQL, MongoDB, Redis operators)
@@ -290,6 +291,110 @@ export async function databaseRoutes(app: FastifyInstance) {
       return reply.status(200).send({ success: true, message: 'Database deletion initiated' });
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  // Migrate data from external MongoDB (e.g. Railway) into this database
+  app.post<{ Params: { namespace: string; type: string; name: string }; Body: { sourceUri: string } }>('/api/databases/:namespace/:type/:name/migrate', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Migrate data from an external MongoDB (e.g. Railway) into this database instance',
+      params: {
+        type: 'object',
+        properties: {
+          namespace: { type: 'string' },
+          type: { type: 'string' },
+          name: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        required: ['sourceUri'],
+        properties: {
+          sourceUri: { type: 'string', description: 'MongoDB connection URI from Railway or other provider' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { namespace, type, name } = request.params;
+    const { sourceUri } = request.body;
+
+    if (type !== 'mongodb') {
+      return reply.status(400).send({ error: 'Migration is currently only supported for MongoDB' });
+    }
+
+    // Verify ownership
+    const project = user.role === 'admin'
+      ? await prisma.project.findFirst({ where: { k8sNamespace: namespace } })
+      : await prisma.project.findFirst({ where: { k8sNamespace: namespace, userId: user.id } });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project namespace not found' });
+    }
+
+    // Get target connection details
+    const vars = await getDatabaseVariables(namespace, type, name);
+    const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
+
+    // Find the MongoDB pod
+    let podName = '';
+    try {
+      const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({
+        namespace,
+        labelSelector: `app.kubernetes.io/name=${name},app.kubernetes.io/component=rs0`,
+      });
+      const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
+      podName = items[0]?.metadata?.name || '';
+    } catch {
+      // Fallback: try listing pods with name filter
+      try {
+        const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({ namespace });
+        const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
+        const found = items.find((p: any) => p.metadata?.name?.includes(name) && p.status?.phase === 'Running');
+        podName = found?.metadata?.name || '';
+      } catch { /* continue */ }
+    }
+
+    if (!podName) {
+      return reply.status(404).send({ error: 'MongoDB pod not found. Is the database running?' });
+    }
+
+    try {
+      // Run mongodump from source URI into the pod's tmp directory
+      const dumpDir = `/tmp/migration-${Date.now()}`;
+
+      // Step 1: mongodump from source (Railway)
+      const dumpCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mkdir -p ${dumpDir} && mongodump --uri=\\"${sourceUri}\\" --out=${dumpDir} --gzip"`;
+      execSync(dumpCmd, { timeout: 300000, encoding: 'utf-8' });
+
+      // Step 2: mongorestore into target
+      const restoreCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mongorestore --uri=\\"${targetUri}\\" --dir=${dumpDir} --gzip --drop"`;
+      execSync(restoreCmd, { timeout: 300000, encoding: 'utf-8' });
+
+      // Step 3: Cleanup
+      const cleanupCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "rm -rf ${dumpDir}"`;
+      execSync(cleanupCmd, { timeout: 30000, encoding: 'utf-8' });
+
+      return reply.status(200).send({
+        success: true,
+        message: 'Migration completed successfully',
+        target: {
+          host: vars.host,
+          port: vars.port,
+          database: vars.databaseName,
+        },
+      });
+    } catch (err: any) {
+      const errMsg = err.stderr || err.message || 'Migration failed';
+      return reply.status(500).send({
+        error: 'Migration failed',
+        details: errMsg.includes(' mongodump') ? 'Failed to dump data from source. Check your connection string.' :
+                 errMsg.includes(' mongorestore') ? 'Failed to restore data to target. Check if the target database is accessible.' :
+                 errMsg,
+      });
     }
   });
 }

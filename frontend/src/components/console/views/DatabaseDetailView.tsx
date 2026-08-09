@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock } from 'lucide-react';
+import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock, ArrowDownToLine } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
@@ -14,7 +14,7 @@ const DB_INFO: Record<string, { label: string; icon: string; color: string }> = 
   redis: { label: 'Redis', icon: '🔴', color: '#DC382D' },
 };
 
-type Tab = 'variables' | 'connect' | 'credentials' | 'logs' | 'advanced';
+type Tab = 'variables' | 'connect' | 'credentials' | 'logs' | 'advanced' | 'migrate';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -67,6 +67,10 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState('');
   const [activeLang, setActiveLang] = useState('nodejs');
+  const [migrateUri, setMigrateUri] = useState('');
+  const [migrateBusy, setMigrateBusy] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [migrateError, setMigrateError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -118,6 +122,22 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     }
   };
 
+  const doMigrate = async () => {
+    if (!migrateUri.trim()) return;
+    setMigrateBusy(true);
+    setMigrateResult(null);
+    setMigrateError('');
+    try {
+      const res: any = await api.migrateDatabase(namespace, type, dbName, migrateUri.trim());
+      setMigrateResult({ success: true, message: res?.message || 'Migration completed successfully' });
+      setMigrateUri('');
+    } catch (err: any) {
+      setMigrateError(err.message || 'Migration failed');
+    } finally {
+      setMigrateBusy(false);
+    }
+  };
+
   if (loading) return <Loader label={`Loading ${info.label}...`} />;
   if (!db && !vars) return <ErrorBanner message={error || 'Database not found'} onRetry={load} />;
 
@@ -136,6 +156,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     { id: 'connect', label: 'Connect', icon: <Plug className="w-3.5 h-3.5" /> },
     { id: 'credentials', label: 'Credentials', icon: <Lock className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
+    ...(dbType === 'mongodb' ? [{ id: 'migrate' as Tab, label: 'Migrate Data', icon: <ArrowDownToLine className="w-3.5 h-3.5" /> }] : []),
     { id: 'advanced', label: 'Advanced', icon: <Database className="w-3.5 h-3.5" /> },
   ];
 
@@ -348,6 +369,81 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
             <GhostButton onClick={openLogs}><Terminal className="w-3.5 h-3.5" /> View logs</GhostButton>
           </div>
           <p className="text-xs text-slate-400">Database logs are accessed via the platform. Click "View logs" to see the command.</p>
+        </div>
+      )}
+
+      {/* Migrate Tab */}
+      {tab === 'migrate' && dbType === 'mongodb' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-[#00459c]/10 text-[#00459c] flex items-center justify-center">
+                <ArrowDownToLine className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Migrate from Railway (or other provider)</h3>
+                <p className="text-[11px] text-slate-400">Import all collections and documents from an external MongoDB into this database.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source MongoDB Connection URI *</label>
+                <input
+                  type="text"
+                  value={migrateUri}
+                  onChange={(e) => setMigrateUri(e.target.value)}
+                  placeholder="mongodb://username:password@host:5432/dbname?authSource=admin"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                  disabled={migrateBusy}
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Find this in Railway dashboard → your database → Variables → <code>MONGO_URL</code> or <code>MONGODB_URI</code>
+                </p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-700">
+                <strong>Warning:</strong> This will overwrite any existing data in this database. Make sure the source database is accessible from the internet.
+              </div>
+
+              {migrateResult && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-4 py-3">
+                  {migrateResult.message}
+                </div>
+              )}
+
+              {migrateError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3">
+                  {migrateError}
+                </div>
+              )}
+
+              <button
+                onClick={doMigrate}
+                disabled={migrateBusy || !migrateUri.trim()}
+                className="bg-[#00459c] hover:bg-[#003577] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs px-5 py-2.5 transition-colors cursor-pointer flex items-center gap-2"
+              >
+                {migrateBusy ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Migrating... (this may take a while)</>
+                ) : (
+                  <><ArrowDownToLine className="w-3.5 h-3.5" /> Start Migration</>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-bold text-slate-900 mb-3">How it works</h3>
+            <ol className="text-xs text-slate-500 space-y-2 list-decimal list-inside">
+              <li>DigiWise connects to your source MongoDB (Railway, Atlas, etc.)</li>
+              <li>Dumps all collections and documents using <code>mongodump</code></li>
+              <li>Restores everything into this database using <code>mongorestore</code></li>
+              <li>Cleans up temporary files</li>
+            </ol>
+            <p className="text-[10px] text-slate-400 mt-3">
+              The source MongoDB must be reachable from the internet. For Railway, grab the connection URI from your service Variables.
+            </p>
+          </div>
         </div>
       )}
 

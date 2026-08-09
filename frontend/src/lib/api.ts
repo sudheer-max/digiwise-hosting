@@ -317,6 +317,13 @@ class ApiClient {
     return this.request(`/databases/${namespace}/${type}/${name}/variables`);
   }
 
+  migrateDatabase(namespace: string, type: string, name: string, sourceUri: string) {
+    return this.request(`/databases/${namespace}/${type}/${name}/migrate`, {
+      method: 'POST',
+      body: JSON.stringify({ sourceUri }),
+    });
+  }
+
   // === GITHUB DEPLOY ===
 
   deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> }) {
