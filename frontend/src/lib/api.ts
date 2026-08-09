@@ -130,6 +130,28 @@ class ApiClient {
     return `${API_BASE}/plan/razorpay-cancel`;
   }
 
+  // Upload ZIP deployment
+  uploadZip(projectId: string, opts: { name: string; port: number; file: File }) {
+    const formData = new FormData();
+    formData.append('file', opts.file);
+    formData.append('name', opts.name);
+    formData.append('port', String(opts.port));
+
+    return fetch(`${API_BASE}/api/projects/${projectId}/apps/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.getToken()}`,
+      },
+      body: formData,
+    }).then(async (r) => {
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error || body.message || `HTTP ${r.status}`);
+      }
+      return r.json();
+    });
+  }
+
   // Admin
   getAdminStats() {
     return this.request('/admin/stats');

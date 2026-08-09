@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Rocket, Box, Database, Loader2, ArrowLeft, ArrowRight,
-  Check, Plus, Search, Github
+  Check, Plus, Search, Github, Upload
 } from 'lucide-react';
 import api from '../../lib/api';
 import { PrimaryButton, GhostButton, Modal } from './ui';
 
 type Step = 1 | 2 | 3 | 4;
-type AppType = 'web' | 'database' | 'github';
+type AppType = 'web' | 'database' | 'github' | 'upload';
 
 interface Project {
   id: string;
@@ -61,6 +61,9 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
   const [dbType, setDbType] = useState<string>('postgresql');
   const [dbName, setDbName] = useState('');
 
+  // Step 3: config — upload
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+
   // Step 4: review
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -100,9 +103,10 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
       if (appType === 'web') return !!appName.trim() && !!image.trim() && port > 0;
       if (appType === 'github') return !!appName.trim() && !!repoURL.trim();
       if (appType === 'database') return !!dbName.trim();
+      if (appType === 'upload') return !!appName.trim() && !!uploadFile;
     }
     return true;
-  }, [step, createNewProject, newProjectName, selectedProjectId, appType, appName, image, port, dbName, repoURL]);
+  }, [step, createNewProject, newProjectName, selectedProjectId, appType, appName, image, port, dbName, repoURL, uploadFile]);
 
   const next = () => { setError(''); setStep((s) => (s + 1) as Step); };
   const back = () => { setError(''); setStep((s) => (s - 1) as Step); };
@@ -151,6 +155,14 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
           startCommand: startCommand.trim() || undefined,
           port,
           ...(Object.keys(env).length > 0 ? { env } : {}),
+        });
+        setResult(res);
+        if (onCreated) onCreated(appName);
+      } else if (appType === 'upload') {
+        const res: any = await api.uploadZip(projectId, {
+          name: appName.trim(),
+          port,
+          file: uploadFile!,
         });
         setResult(res);
         if (onCreated) onCreated(appName);
@@ -312,6 +324,17 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               <Database className="w-8 h-8" />
               <span className="uppercase tracking-wider">Database</span>
               <span className="text-[10px] font-normal text-slate-400 normal-case">PostgreSQL, MySQL, MongoDB, or Redis</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setAppType('upload')}
+              className={`flex flex-col items-center gap-3 border px-4 py-6 text-xs font-bold transition-colors cursor-pointer ${appType === 'upload' ? 'border-[#00459c] bg-[#00459c]/5 text-[#00459c]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+            >
+              <Upload className="w-8 h-8" />
+              <span className="uppercase tracking-wider">Upload ZIP</span>
+              <span className="text-[10px] font-normal text-slate-400 normal-case">Upload and auto-deploy a project archive</span>
             </button>
           </div>
 
@@ -537,6 +560,77 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               </div>
             </>
           )}
+
+          {appType === 'upload' && (
+            <>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">App Name *</label>
+                <input
+                  type="text"
+                  value={appName}
+                  onChange={(e) => onAppNameChange(e.target.value)}
+                  placeholder="my-app"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Port</label>
+                <input
+                  type="number"
+                  value={port}
+                  onChange={(e) => setPort(Number(e.target.value) || 3000)}
+                  min={1}
+                  max={65535}
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Project ZIP File *</label>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) setUploadFile(file);
+                  }}
+                  className="border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center cursor-pointer hover:border-[#00459c] transition-colors"
+                  onClick={() => document.getElementById('zip-upload-input')?.click()}
+                >
+                  <input
+                    id="zip-upload-input"
+                    type="file"
+                    accept=".zip"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setUploadFile(file);
+                    }}
+                  />
+                  {uploadFile ? (
+                    <div>
+                      <Upload className="w-6 h-6 text-[#00459c] mx-auto mb-2" />
+                      <p className="text-xs font-bold text-slate-700">{uploadFile.name}</p>
+                      <p className="text-[10px] text-slate-400">{(uploadFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setUploadFile(null); }}
+                        className="text-[10px] text-rose-500 hover:text-rose-700 mt-2 underline cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs font-bold text-slate-500">Drop a ZIP file here or click to browse</p>
+                      <p className="text-[10px] text-slate-400">Supports Node.js, Python, Go, and static sites</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -550,7 +644,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Type</span>
-              <span className="font-mono text-slate-700">{appType === 'web' ? 'Web App' : appType === 'github' ? 'GitHub Repo' : `Database (${DB_LABELS[dbType]})`}</span>
+              <span className="font-mono text-slate-700">{appType === 'web' ? 'Web App' : appType === 'github' ? 'GitHub Repo' : appType === 'upload' ? 'Upload ZIP' : `Database (${DB_LABELS[dbType]})`}</span>
             </div>
             {appType === 'web' && (
               <>
@@ -600,11 +694,27 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                 </div>
               </>
             )}
+            {appType === 'upload' && (
+              <>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">App Name</span>
+                  <span className="font-mono text-slate-700">{appName}</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">File</span>
+                  <span className="font-mono text-slate-700">{uploadFile?.name || '—'}</span>
+                </div>
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Port</span>
+                  <span className="font-mono text-slate-700">{port}</span>
+                </div>
+              </>
+            )}
           </div>
 
           {result && (
             <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-4 py-3">
-              {appType === 'web' ? 'Application' : appType === 'github' ? 'Application deployed from GitHub' : 'Database'} created successfully.
+              {appType === 'web' ? 'Application' : appType === 'github' ? 'Application deployed from GitHub' : appType === 'upload' ? 'Application deployed from ZIP' : 'Database'} created successfully.
               {result.externalUrl && (
                 <span className="ml-2">
                   <a href={result.externalUrl} target="_blank" rel="noopener" className="underline">Open URL</a>
