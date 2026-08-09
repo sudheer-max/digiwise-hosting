@@ -326,7 +326,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
               <ConnectionField label="Database Name" value={dbName} />
             </div>
             <div className="mt-4 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2">
-              Store these credentials securely. The password is stored in a Kubernetes Secret.
+              Store these credentials securely. The password is stored as an encrypted secret.
             </div>
           </div>
 
@@ -344,10 +344,10 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
       {tab === 'logs' && (
         <div className="bg-white border border-slate-200 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-900">Container Logs</h3>
+            <h3 className="text-sm font-bold text-slate-900">Service Logs</h3>
             <GhostButton onClick={openLogs}><Terminal className="w-3.5 h-3.5" /> View logs</GhostButton>
           </div>
-          <p className="text-xs text-slate-400">Database logs are accessed via kubectl. Click "View logs" to see the command.</p>
+          <p className="text-xs text-slate-400">Database logs are accessed via the platform. Click "View logs" to see the command.</p>
         </div>
       )}
 

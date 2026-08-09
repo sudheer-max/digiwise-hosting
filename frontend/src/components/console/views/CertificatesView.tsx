@@ -10,8 +10,8 @@ export default function CertificatesView() {
         <SectionHeader title="Certificates" subtitle="SSL certificates managed by cert-manager." />
         <EmptyState
           icon={<ShieldCheck className="w-6 h-6" />}
-          title="Certificates managed by Kubernetes"
-          hint="SSL/TLS certificates are automatically provisioned by cert-manager with Let's Encrypt. Configure via Ingress annotations."
+          title="Certificates managed automatically"
+          hint="SSL/TLS certificates are automatically provisioned and renewed. Configure via routing annotations."
         />
       </div>
     </AdminGate>

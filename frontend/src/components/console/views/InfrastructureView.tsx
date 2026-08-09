@@ -20,7 +20,7 @@ const SERVICES: ServiceConfig[] = [
   {
     id: 'argocd',
     name: 'ArgoCD',
-    description: 'GitOps continuous delivery for Kubernetes. Manages application deployments from Git repositories.',
+    description: 'GitOps continuous delivery. Manages application deployments from Git repositories.',
     url: 'https://argocd.digiwisesoftech.com',
     icon: <Workflow className="w-6 h-6" />,
     color: '#E8563D',
@@ -40,7 +40,7 @@ const SERVICES: ServiceConfig[] = [
   {
     id: 'harbor',
     name: 'Harbor',
-    description: 'Private container registry. Store and manage Docker images with vulnerability scanning.',
+    description: 'Private app image registry. Store and manage images with vulnerability scanning.',
     url: 'https://harbor.digiwisesoftech.com',
     icon: <Warehouse className="w-6 h-6" />,
     color: '#4495D7',
@@ -50,7 +50,7 @@ const SERVICES: ServiceConfig[] = [
   {
     id: 'prometheus',
     name: 'Prometheus',
-    description: 'Metrics collection and alerting. Monitor cluster and application health.',
+    description: 'Metrics collection and alerting. Monitor environment and application health.',
     url: 'https://prometheus.digiwisesoftech.com',
     icon: <Camera className="w-6 h-6" />,
     color: '#E6522C',
@@ -180,23 +180,23 @@ export default function InfrastructureView() {
       <div className="bg-white border border-slate-200 shadow-sm p-5">
         <h3 className="text-sm font-bold text-slate-900 mb-3">About Infrastructure Services</h3>
         <div className="text-xs text-slate-500 space-y-2">
-          <p>All services are deployed on the K3s cluster and accessible via Traefik ingress with automatic TLS certificates.</p>
+          <p>All services are deployed on the cloud engine and accessible via the routing layer with automatic TLS certificates.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
             <div className="bg-slate-50 border border-slate-200 p-3">
               <div className="font-bold text-slate-700 mb-1">ArgoCD</div>
-              <div className="text-[10px] text-slate-400">GitOps engine that syncs your applications from Git. Connect repositories and manage deployments declaratively.</div>
+              <div className="text-[10px] text-slate-400">Deployment system that syncs your applications from Git. Connect repositories and manage deployments.</div>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-3">
               <div className="font-bold text-slate-700 mb-1">Grafana + Prometheus</div>
-              <div className="text-[10px] text-slate-400">Full observability stack. Prometheus scrapes metrics, Grafana visualizes them with pre-built dashboards.</div>
+              <div className="text-[10px] text-slate-400">Full observability stack. Prometheus scrapes metrics, Grafana visualizes them with dashboards.</div>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-3">
-              <div className="font-bold text-slate-700 mb-1">Harbor Registry</div>
-              <div className="text-[10px] text-slate-400">Private Docker image registry with vulnerability scanning, RBAC, and image replication.</div>
+              <div className="font-bold text-slate-700 mb-1">App Registry</div>
+              <div className="text-[10px] text-slate-400">Private app image registry with vulnerability scanning and image management.</div>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-3">
-              <div className="font-bold text-slate-700 mb-1">K3s Cluster</div>
-              <div className="text-[10px] text-slate-400">Lightweight Kubernetes distribution powering all workloads. Managed via kubectl or the K3s CLI.</div>
+              <div className="font-bold text-slate-700 mb-1">Cloud Engine</div>
+              <div className="text-[10px] text-slate-400">Lightweight cloud engine powering all workloads.</div>
             </div>
           </div>
         </div>

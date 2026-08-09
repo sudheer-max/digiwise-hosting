@@ -21,7 +21,7 @@ export default function CentralStationView() {
 
   const checks = [
     { label: 'API', status: health ? (health.status === 'ok' || health.status === 'healthy' || health.healthy ? 'healthy' : 'degraded') : 'loading' },
-    { label: 'Kubernetes', status: health ? (health.kubernetes === 'healthy' || health.k8s === 'healthy' ? 'healthy' : 'degraded') : 'loading' },
+    { label: 'Cloud Platform', status: health ? (health.kubernetes === 'healthy' || health.k8s === 'healthy' ? 'healthy' : 'degraded') : 'loading' },
     { label: 'Database', status: health?.database?.status === 'healthy' ? 'healthy' : health ? 'degraded' : 'loading' },
   ];
 
@@ -52,7 +52,7 @@ export default function CentralStationView() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { icon: <Server className="w-4 h-4" />, label: 'K3s Cluster', desc: 'Lightweight Kubernetes on your infrastructure.' },
+          { icon: <Server className="w-4 h-4" />, label: 'Cloud Engine', desc: 'Lightweight cloud engine powering your infrastructure.' },
           { icon: <Database className="w-4 h-4" />, label: 'Managed data stores', desc: 'PostgreSQL, MongoDB, Redis via operators.' },
           { icon: <Box className="w-4 h-4" />, label: 'Proxy layer', desc: 'Traefik edge with automatic TLS.' },
         ].map((c) => (

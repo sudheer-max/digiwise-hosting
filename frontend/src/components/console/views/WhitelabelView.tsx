@@ -11,7 +11,7 @@ export default function WhitelabelView() {
         <EmptyState
           icon={<Palette className="w-6 h-6" />}
           title="Whitelabeling not available"
-          hint="Platform branding is managed through the frontend configuration. Edit the theme settings in your deployment."
+          hint="Platform branding is managed through the frontend configuration. Edit the theme settings in your platform."
         />
       </div>
     </AdminGate>

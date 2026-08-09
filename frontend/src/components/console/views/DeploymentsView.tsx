@@ -52,8 +52,8 @@ export default function DeploymentsView() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Deployments"
-        subtitle={`${deployments.length} most recent deployments across all projects.`}
+        title="Applications"
+        subtitle={`${deployments.length} most recent apps across all projects.`}
         action={
           <GhostButton onClick={loadAll} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Reload
@@ -64,11 +64,11 @@ export default function DeploymentsView() {
       {error && <ErrorBanner message={error} onRetry={loadAll} />}
 
       {loading ? (
-        <Loader label="Scanning deployments..." />
+        <Loader label="Scanning apps..." />
       ) : deployments.length === 0 ? (
         <EmptyState
           icon={<ListTree className="w-6 h-6" />}
-          title="No deployments yet"
+          title="No apps yet"
           hint="Deploy any application to see its history here."
         />
       ) : (

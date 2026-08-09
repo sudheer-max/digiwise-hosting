@@ -8,8 +8,8 @@ export default function SchedulesView() {
       <SectionHeader title="Schedules" subtitle="Cron-based automated deployments for your services." />
       <EmptyState
         icon={<Clock className="w-6 h-6" />}
-        title="Schedules managed by Kubernetes"
-        hint="Scheduled tasks are handled by Kubernetes CronJobs. Create CronJob resources via kubectl or ArgoCD to run tasks on a schedule."
+        title="Scheduled tasks"
+        hint="Scheduled tasks are handled by the platform's scheduling system. Create scheduled tasks via the dashboard to run tasks on a schedule."
       />
     </div>
   );

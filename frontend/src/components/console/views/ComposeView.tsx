@@ -9,7 +9,7 @@ export default function ComposeView() {
       <EmptyState
         icon={<Boxes className="w-6 h-6" />}
         title="Compose is not available"
-        hint="Docker Compose is replaced by Kubernetes Deployments and Services. Use the Projects view to manage multi-container applications."
+        hint="Use the Applications view to manage your services."
       />
     </div>
   );

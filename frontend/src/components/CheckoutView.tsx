@@ -152,7 +152,7 @@ export default function CheckoutView({ selectedPlan, cartItems = [], onPurchaseC
       {/* HEADER SECTION */}
       <div>
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-sans">Secure Checkout</h1>
-        <p className="text-slate-500 text-sm mt-1">Configure your billing profile details to deploy your active NVMe container cluster.</p>
+        <p className="text-slate-500 text-sm mt-1">Configure your billing details to activate your cloud hosting environment.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">

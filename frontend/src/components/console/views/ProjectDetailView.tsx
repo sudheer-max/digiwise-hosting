@@ -160,7 +160,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           <div className="text-2xl font-display font-bold text-slate-900 mt-1">{databases.length}</div>
         </div>
         <div className="bg-white border border-slate-200 shadow-sm px-4 py-3">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Namespace</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Project</div>
           <div className="text-sm font-mono text-slate-700 mt-1 truncate">{ns}</div>
         </div>
         <div className="bg-white border border-slate-200 shadow-sm px-4 py-3">
@@ -185,7 +185,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
             <div className="text-center py-8">
               <Rocket className="w-10 h-10 text-slate-200 mx-auto mb-3" />
               <p className="text-sm font-bold text-slate-700">No applications yet</p>
-              <p className="text-xs text-slate-400 mt-1 mb-4">Deploy a web service from a Docker image or GitHub repository.</p>
+              <p className="text-xs text-slate-400 mt-1 mb-4">Deploy a web service from an app image or GitHub repository.</p>
               <PrimaryButton onClick={() => setShowCreateApp(true)}>
                 <Plus className="w-4 h-4" /> Deploy Application
               </PrimaryButton>
@@ -335,7 +335,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
               </div>
             </div>
             <div className="bg-slate-50 border border-slate-200 px-3 py-2 text-[10px] text-slate-500">
-              Database will be provisioned in namespace <span className="font-mono font-bold">{ns}</span> by the Kubernetes operator.
+              Database will be provisioned in project <span className="font-mono font-bold">{ns}</span> by the management system.
             </div>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
               <GhostButton onClick={() => setShowCreateDb(false)}>Cancel</GhostButton>
@@ -358,7 +358,7 @@ export default function ProjectDetailView({ projectId }: { projectId: string }) 
           title={deleteTarget.type === 'app' ? 'Delete Application' : 'Delete Database'}
           description={
             deleteTarget.type === 'app'
-              ? `Are you sure you want to delete "${deleteTarget.name}"? This will permanently remove the application, its service, and ingress route.`
+              ? `Are you sure you want to delete "${deleteTarget.name}"? This will permanently remove the application, its service, and traffic route.`
               : `Are you sure you want to delete the ${deleteTarget.dbType} database "${deleteTarget.name}"? All data will be permanently lost.`
           }
           confirmName={deleteTarget.name}

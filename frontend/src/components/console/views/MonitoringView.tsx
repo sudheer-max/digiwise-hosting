@@ -27,7 +27,7 @@ export default function MonitoringView() {
     <div className="space-y-6">
       <SectionHeader
         title="Monitoring"
-        subtitle="Cluster metrics and monitoring links."
+        subtitle="Environment metrics and monitoring links."
         action={
           <GhostButton onClick={load} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Reload
@@ -45,7 +45,7 @@ export default function MonitoringView() {
             <div className="bg-white border border-slate-200 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Box className="w-4 h-4 text-[#00459c]" />
-                <span className="text-sm font-bold text-slate-900">Cluster Status</span>
+                <span className="text-sm font-bold text-slate-900">Environment Status</span>
                 <StatusPill status={cluster.ready ? 'healthy' : 'degraded'} />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

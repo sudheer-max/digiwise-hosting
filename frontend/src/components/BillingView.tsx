@@ -7,10 +7,10 @@ export default function BillingView() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const invoices: Invoice[] = [
-    { id: 'INV-92831', date: 'Sep 12, 2024', amount: 482.00, status: 'PAID', plan: 'Enterprise Cluster Sub' },
-    { id: 'INV-92744', date: 'Aug 12, 2024', amount: 482.00, status: 'PAID', plan: 'Enterprise Cluster Sub' },
+    { id: 'INV-92831', date: 'Sep 12, 2024', amount: 482.00, status: 'PAID', plan: 'Enterprise Hosting' },
+    { id: 'INV-92744', date: 'Aug 12, 2024', amount: 482.00, status: 'PAID', plan: 'Enterprise Hosting' },
     { id: 'INV-91902', date: 'Jul 12, 2024', amount: 1250.00, status: 'PAID', plan: 'Global Storage Pool Provisioning' },
-    { id: 'INV-91022', date: 'Jun 12, 2024', amount: 410.50, status: 'PAID', plan: 'Enterprise Cluster Sub' },
+    { id: 'INV-91022', date: 'Jun 12, 2024', amount: 410.50, status: 'PAID', plan: 'Enterprise Hosting' },
   ];
 
   const handleRefresh = () => {

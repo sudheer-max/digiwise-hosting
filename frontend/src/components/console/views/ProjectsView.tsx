@@ -80,7 +80,7 @@ export default function ProjectsView() {
                 required
                 autoFocus
               />
-              <p className="text-[10px] text-slate-400 mt-1">Lowercase letters, numbers, and hyphens only. This becomes the Kubernetes namespace.</p>
+              <p className="text-[10px] text-slate-400 mt-1">Lowercase letters, numbers, and hyphens only. This becomes the project identifier.</p>
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Description</label>
@@ -153,7 +153,7 @@ export default function ProjectsView() {
       {deleteTarget && (
         <ConfirmDeleteDialog
           title="Delete Project"
-          description={`Are you sure you want to delete "${deleteTarget.name}"? This will permanently remove the project and all its applications, databases, and Kubernetes resources.`}
+          description={`Are you sure you want to delete "${deleteTarget.name}"? This will permanently remove the project and all its applications, databases, and resources.`}
           confirmName={deleteTarget.name}
           onConfirm={doDelete}
           onCancel={() => setDeleteTarget(null)}

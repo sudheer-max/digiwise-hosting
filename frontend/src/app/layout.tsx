@@ -2,8 +2,8 @@ import '../index.css';
 import ClientLayout from '../components/ClientLayout';
 
 export const metadata = {
-  title: 'DigiWise Kubernetes - Enterprise K3s Cloud Platform',
-  description: 'Managed Kubernetes platform with K3s, Traefik, ArgoCD, Longhorn and CloudNativePG. Deploy apps, databases and sites on a production-grade cluster.',
+  title: 'DigiWise Hosting - Deploy Apps & Databases in Seconds',
+  description: 'Deploy web apps, APIs, and managed databases on a production-grade cloud platform. No DevOps skills needed. Free to start.',
 };
 
 export default function RootLayout({

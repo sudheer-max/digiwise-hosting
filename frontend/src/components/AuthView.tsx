@@ -73,8 +73,8 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
           </h2>
           <p className="text-slate-400 text-xs mt-1">
             {mode === 'login'
-              ? 'Access your secure VPS containers, relational databases, and server workspaces.'
-              : 'Register to deploy and manage your cloud infrastructure.'}
+              ? 'Access your apps, databases, and cloud environment.'
+              : 'Register to deploy and manage your cloud apps and databases.'}
           </p>
         </div>
 

@@ -153,7 +153,7 @@ export default function SupportView() {
                     </tr>
                     <tr className="border-b border-slate-100">
                       <td className="py-3.5 font-bold text-slate-900">EU-West-2 (London)</td>
-                      <td className="py-3.5 text-slate-500">Managed Kubernetes</td>
+                      <td className="py-3.5 text-slate-500">Managed Cloud Platform</td>
                       <td className="py-3.5 font-mono text-slate-500">Private Peering</td>
                       <td className="py-3.5 text-right">
                         <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider border border-emerald-200">
@@ -249,7 +249,7 @@ export default function SupportView() {
                 <label className={labelCls}>Subject / System Issue *</label>
                 <input
                   type="text"
-                  placeholder="e.g., Inbound port 443 blocked on master cluster"
+                  placeholder="e.g., Custom domain not resolving"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   className={inputCls}

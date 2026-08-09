@@ -36,7 +36,7 @@ export default function ApplicationsView() {
           <Rocket className="w-12 h-12 text-slate-200 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-slate-900 mb-2">No applications yet</h3>
           <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
-            Deploy a web service from a Docker image, GitHub repository, or use a template to get started in seconds.
+            Deploy a web service from an app image, GitHub repository, or use a template to get started in seconds.
           </p>
           <div className="flex items-center justify-center gap-3">
             <PrimaryButton onClick={() => setShowCreate(true)}>
@@ -46,8 +46,8 @@ export default function ApplicationsView() {
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
             <div className="bg-slate-50 border border-slate-200 p-4">
               <Box className="w-6 h-6 text-violet-500 mx-auto mb-2" />
-              <div className="text-xs font-bold text-slate-700">Docker Image</div>
-              <div className="text-[10px] text-slate-400 mt-0.5">Deploy any container</div>
+              <div className="text-xs font-bold text-slate-700">App Image</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Deploy any service</div>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-4">
               <Github className="w-6 h-6 text-slate-700 mx-auto mb-2" />
@@ -93,7 +93,7 @@ export default function ApplicationsView() {
                     {!app.repository && app.dockerImage && <span className="font-mono">{app.dockerImage}</span>}
                     <span className="uppercase font-bold text-slate-300 bg-slate-100 px-1.5 py-0.5">{source}</span>
                   </div>
-                  {app.replicas != null && <span className="text-[10px] font-bold text-slate-400">{app.replicas} replica(s)</span>}
+                  {app.replicas != null &&               <div className="text-[10px] font-bold text-slate-400">{app.replicas} copy(ies)</div>}
                   {app.externalUrl && (
                     <a href={app.externalUrl} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="text-[#00459c] hover:text-[#003882]">
                       <ExternalLink className="w-3.5 h-3.5" />

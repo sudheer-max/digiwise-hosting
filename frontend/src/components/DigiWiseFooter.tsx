@@ -48,7 +48,7 @@ export default function DigiWiseFooter() {
               <img src="/DIGIWISE-SOFTECH-LOGO.png" alt="DigiWise Logo" className="h-8 w-auto" />
             </Link>
             <p className="text-xs leading-relaxed max-w-sm">
-              Managed Kubernetes platform with K3s, Traefik, ArgoCD and Longhorn. Deploy apps, databases and sites on a production-grade cluster.
+              Managed cloud platform with auto-SSL, reliable storage, and Git-based deployments. Deploy apps, databases and sites in seconds.
             </p>
             <div className="flex gap-2.5 mt-2">
               <div className="w-8 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-[#00459c] hover:border-[#00459c]/40 transition-colors cursor-pointer">
@@ -98,7 +98,7 @@ export default function DigiWiseFooter() {
                   </span>
                   <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Operational</span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-2 leading-relaxed whitespace-nowrap">All Kubernetes systems operational.</p>
+                <p className="text-[10px] text-slate-500 mt-2 leading-relaxed whitespace-nowrap">All systems operational.</p>
               </Link>
               <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
                 <Activity className="w-3.5 h-3.5 text-[#00459c] shrink-0" />

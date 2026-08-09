@@ -10,8 +10,8 @@ export default function NotificationsView() {
         <SectionHeader title="Notifications" subtitle="Channels that receive alerts about your deployments." />
         <EmptyState
           icon={<Bell className="w-6 h-6" />}
-          title="Notifications managed by operators"
-          hint="Deployment notifications are handled by Kubernetes operators (ArgoCD, Prometheus AlertManager). Configure alerts via Helm values."
+          title="Notifications managed by management system"
+          hint="Deployment notifications are handled by the platform's management system. Configure alerts via the dashboard."
         />
       </div>
     </AdminGate>

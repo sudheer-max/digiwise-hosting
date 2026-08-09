@@ -8,8 +8,8 @@ export default function WebServerView() {
       <SectionHeader title="Web Server" subtitle="Configuration for the web server serving your static sites." />
       <EmptyState
         icon={<Globe className="w-6 h-6" />}
-        title="Web server managed by K3s"
-        hint="Static sites are served via Kubernetes Deployments and Traefik Ingress. Configure via IngressRoute resources."
+        title="Web server managed by cloud engine"
+        hint="Static sites are served via the platform's deployment and routing system. Configure via the dashboard."
       />
     </div>
   );

@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Server, Database, Globe, Mail, Shield, CreditCard,
 
 export default function StatusPage() {
   const services = [
-    { name: 'Deployments Engine', status: 'Operational', icon: Server },
+    { name: 'Deployment Engine', status: 'Operational', icon: Server },
     { name: 'Web Hosting Platform', status: 'Operational', icon: Globe },
     { name: 'VPS Compute', status: 'Operational', icon: Cpu },
     { name: 'Managed Databases', status: 'Operational', icon: Database },

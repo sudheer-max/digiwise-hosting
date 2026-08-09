@@ -305,7 +305,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
             >
               <Box className="w-8 h-8" />
               <span className="uppercase tracking-wider">Web App</span>
-              <span className="text-[10px] font-normal text-slate-400 normal-case">Docker image deployment</span>
+              <span className="text-[10px] font-normal text-slate-400 normal-case">Deploy from an image</span>
             </button>
             <button
               type="button"
@@ -363,7 +363,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Docker Image *</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">App Image *</label>
                 <input
                   type="text"
                   value={image}
@@ -374,7 +374,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Container Port *</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Port *</label>
                   <input
                     type="number"
                     value={port}
@@ -385,7 +385,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Replicas</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Copies</label>
                   <input
                     type="number"
                     value={replicas}

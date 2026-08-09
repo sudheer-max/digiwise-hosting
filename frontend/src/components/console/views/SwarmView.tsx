@@ -7,12 +7,12 @@ export default function SwarmView() {
     <div className="space-y-6">
       <SectionHeader
         title="Swarm"
-        subtitle="Docker Swarm cluster management."
+        subtitle="Container orchestration."
       />
       <EmptyState
         icon={<Network className="w-6 h-6" />}
         title="Docker Swarm not supported"
-        hint="This platform uses Kubernetes (K3s) for orchestration. Docker Swarm is not available."
+        hint="This platform uses a cloud engine for orchestration. Docker Swarm is not available."
       />
     </div>
   );

@@ -29,7 +29,7 @@ export default function ClusterView() {
     <div className="space-y-6">
       <SectionHeader
         title="Cluster"
-        subtitle="Kubernetes cluster node information."
+        subtitle="Cloud environment server information."
         action={
           <GhostButton onClick={load} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Reload
@@ -47,7 +47,7 @@ export default function ClusterView() {
             <div className="bg-white border border-slate-200 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Network className="w-4 h-4 text-[#00459c]" />
-                <span className="text-sm font-bold text-slate-900">K3s Cluster</span>
+                <span className="text-sm font-bold text-slate-900">Cloud Engine</span>
                 <StatusPill status={cluster.ready ? 'healthy' : 'degraded'} />
               </div>
               <FieldGrid>

@@ -35,7 +35,7 @@ export default function ServersView() {
   if (denied) {
     return (
       <div className="space-y-6">
-        <SectionHeader title="Servers" subtitle="Kubernetes cluster node information." />
+        <SectionHeader title="Servers" subtitle="Cloud environment servers." />
         <EmptyState
           icon={<ShieldAlert className="w-6 h-6" />}
           title="Admin access required"
@@ -49,7 +49,7 @@ export default function ServersView() {
     <div className="space-y-6">
       <SectionHeader
         title="Servers"
-        subtitle={`${nodes.length} node(s) in your Kubernetes cluster.`}
+        subtitle={`${nodes.length} server(s) in your cloud environment.`}
         action={
           <GhostButton onClick={load} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Reload
@@ -65,7 +65,7 @@ export default function ServersView() {
         <EmptyState
           icon={<Server className="w-6 h-6" />}
           title="No nodes found"
-          hint="Kubernetes cluster nodes will appear here."
+          hint="Cloud environment servers will appear here."
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

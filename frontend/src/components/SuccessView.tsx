@@ -73,7 +73,7 @@ export default function SuccessView({ orderDetails, onGoToDashboard }: SuccessVi
             Deployment Successful
           </h1>
           <p className="text-slate-500 text-sm max-w-lg mx-auto">
-            Your enterprise-grade infrastructure is being provisioned. Your order is confirmed and active.
+            Your cloud environment is being set up. Your order is confirmed and active.
           </p>
         </div>
 
@@ -124,7 +124,7 @@ export default function SuccessView({ orderDetails, onGoToDashboard }: SuccessVi
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-500 font-medium">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[#00459c] font-extrabold text-xs">✓</span>
-                      <span>Virtual Private Server Container virtualisation</span>
+                      <span>Enterprise-grade cloud hosting</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[#00459c] font-extrabold text-xs">✓</span>

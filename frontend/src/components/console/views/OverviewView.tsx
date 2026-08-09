@@ -136,7 +136,7 @@ export default function OverviewView() {
                 <StatusPill status={healthy ? 'healthy' : 'degraded'} />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">Kubernetes</span>
+                <span className="text-xs font-bold text-slate-600">Cloud Platform</span>
                 <StatusPill status={healthy ? 'healthy' : 'degraded'} />
               </div>
               <div className="pt-2 border-t border-slate-100 space-y-2">
@@ -239,8 +239,8 @@ export default function OverviewView() {
       {/* Quick links */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { icon: <Rocket className="w-4 h-4" />, label: 'Deploy an Application', hint: 'Connect a git repo or Docker image', route: { name: 'projects' } as const },
-          { icon: <Database className="w-4 h-4" />, label: 'Provision a Database', hint: 'Postgres, MySQL, Mongo, Redis & more', route: { name: 'databases' } as const },
+          { icon: <Rocket className="w-4 h-4" />, label: 'Deploy an Application', hint: 'Connect a git repo or use an image', route: { name: 'projects' } as const },
+          { icon: <Database className="w-4 h-4" />, label: 'Provision a Database', hint: 'Postgres, MySQL, Mongo, Redis', route: { name: 'databases' } as const },
           { icon: <Globe className="w-4 h-4" />, label: 'Infrastructure', hint: 'ArgoCD, Grafana, Harbor, Prometheus', route: { name: 'infrastructure' } as const },
         ].map((q) => (
           <button

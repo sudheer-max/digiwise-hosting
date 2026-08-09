@@ -10,8 +10,8 @@ export default function TraefikView() {
         <SectionHeader title="Traefik File System" subtitle="Dynamic configuration, environment and file overrides for the reverse proxy." />
         <EmptyState
           icon={<FileCode2 className="w-6 h-6" />}
-          title="Traefik managed by K3s"
-          hint="Traefik is the default ingress controller for K3s. Configuration is managed via Helm values and IngressRoute CRDs."
+          title="Traefik managed by cloud engine"
+          hint="Traefik manages traffic routing for your applications. Configuration is managed via the platform dashboard."
         />
       </div>
     </AdminGate>

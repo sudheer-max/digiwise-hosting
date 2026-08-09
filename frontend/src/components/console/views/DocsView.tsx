@@ -4,7 +4,7 @@ import { SectionHeader, Card } from '../ui';
 
 const DOCS = [
   { title: 'Quickstart', desc: 'Deploy your first service in under a minute.', icon: <TerminalSquare className="w-4 h-4 text-[#00459c]" />, href: 'https://docs.digiwisesoftech.com' },
-  { title: 'Deployments', desc: 'Git pushes, buildpacks and rollbacks.', icon: <GitBranch className="w-4 h-4 text-[#00459c]" />, href: 'https://docs.digiwisesoftech.com/deployments' },
+  { title: 'Applications', desc: 'Git pushes, buildpacks and rollbacks.', icon: <GitBranch className="w-4 h-4 text-[#00459c]" />, href: 'https://docs.digiwisesoftech.com/deployments' },
   { title: 'Databases', desc: 'Postgres, MySQL, Redis, MongoDB guides.', icon: <FileText className="w-4 h-4 text-[#00459c]" />, href: 'https://docs.digiwisesoftech.com/databases' },
   { title: 'Pricing & billing', desc: 'Plans, usage metering and invoicing.', icon: <BookOpen className="w-4 h-4 text-[#00459c]" />, href: 'https://docs.digiwisesoftech.com/pricing' },
 ];

@@ -85,7 +85,7 @@ export default function SettingsView() {
                 )}
                 {health.kubernetes && (
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600">Kubernetes</span>
+                    <span className="text-xs font-bold text-slate-600">Cloud Platform</span>
                     <StatusPill status={health.kubernetes === 'healthy' ? 'healthy' : 'degraded'} />
                   </div>
                 )}
@@ -93,7 +93,7 @@ export default function SettingsView() {
             )}
           </Card>
 
-          <Card title="Kubernetes Cluster" icon={<Globe className="w-4 h-4 text-[#00459c]" />}>
+          <Card title="Cloud Environment" icon={<Globe className="w-4 h-4 text-[#00459c]" />}>
             {!cluster ? (
               <div className="text-xs text-slate-400">Cluster info unavailable.</div>
             ) : (
@@ -137,9 +137,9 @@ export default function SettingsView() {
 
           <Card title="Diagnostics" icon={<Info className="w-4 h-4 text-[#00459c]" />}>
             <div className="space-y-2 text-xs text-slate-500">
-              <div>Platform: DigiWise Hosting (Kubernetes)</div>
+              <div>Platform: DigiWise Hosting (Cloud Platform)</div>
               <div>Orchestration: K3s</div>
-              <div>Ingress: Traefik</div>
+              <div>Routing: Traefik</div>
               <div>Storage: Longhorn</div>
               <div>Registry: Harbor</div>
             </div>

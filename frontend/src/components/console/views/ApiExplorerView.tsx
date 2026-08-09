@@ -24,30 +24,30 @@ const endpoints: Endpoint[] = [
   { id: 'getMe', method: 'GET', path: '/api/auth/me', label: 'Get Current User', description: 'Get the currently authenticated user profile.', category: 'Auth' },
 
   // ── Projects ──
-  { id: 'listProjects', method: 'GET', path: '/api/projects', label: 'List Projects', description: 'List all Kubernetes namespaces (projects) for the authenticated user.', category: 'Projects' },
-  { id: 'createProject', method: 'POST', path: '/api/projects', label: 'Create Project', description: 'Create a new Kubernetes namespace (project).', category: 'Projects', bodyPlaceholder: '{"name": "my-project", "description": "A test project"}' },
+  { id: 'listProjects', method: 'GET', path: '/api/projects', label: 'List Projects', description: 'List all projects for the authenticated user.', category: 'Projects' },
+  { id: 'createProject', method: 'POST', path: '/api/projects', label: 'Create Project', description: 'Create a new project.', category: 'Projects', bodyPlaceholder: '{"name": "my-project", "description": "A test project"}' },
   { id: 'getProject', method: 'GET', path: '/api/projects/:id', label: 'Get Project', description: 'Get details for a specific project by ID.', category: 'Projects' },
   { id: 'updateProject', method: 'PUT', path: '/api/projects/:id', label: 'Update Project', description: 'Update project name or description.', category: 'Projects', bodyPlaceholder: '{"name": "new-name", "description": "Updated description"}' },
-  { id: 'deleteProject', method: 'DELETE', path: '/api/projects/:id', label: 'Delete Project', description: 'Delete a project (Kubernetes namespace). All resources inside will be removed.', category: 'Projects' },
-  { id: 'listProjectDeployments', method: 'GET', path: '/api/projects/:id/deployments', label: 'Project Deployments', description: 'List all ArgoCD deployments in a project.', category: 'Projects' },
-  { id: 'listProjectPods', method: 'GET', path: '/api/projects/:id/pods', label: 'Project Pods', description: 'List all pods running in a project namespace.', category: 'Projects' },
+  { id: 'deleteProject', method: 'DELETE', path: '/api/projects/:id', label: 'Delete Project', description: 'Delete a project. All resources inside will be removed.', category: 'Projects' },
+  { id: 'listProjectDeployments', method: 'GET', path: '/api/projects/:id/deployments', label: 'Project Apps', description: 'List all apps in a project.', category: 'Projects' },
+  { id: 'listProjectPods', method: 'GET', path: '/api/projects/:id/pods', label: 'Project Services', description: 'List all services running in a project.', category: 'Projects' },
   { id: 'getProjectLogs', method: 'GET', path: '/api/projects/:id/logs', label: 'Project Logs', description: 'Get logs from a project namespace.', category: 'Projects' },
-  { id: 'deployToProject', method: 'POST', path: '/api/projects/:id/deploy', label: 'Deploy via ArgoCD', description: 'Deploy a Git repository to a project via ArgoCD.', category: 'Projects', bodyPlaceholder: '{"name": "my-app", "repoURL": "https://github.com/org/repo.git", "path": ".", "targetRevision": "HEAD"}' },
+  { id: 'deployToProject', method: 'POST', path: '/api/projects/:id/deploy', label: 'Deploy to Project', description: 'Deploy a Git repository to a project.', category: 'Projects', bodyPlaceholder: '{"name": "my-app", "repoURL": "https://github.com/org/repo.git", "path": ".", "targetRevision": "HEAD"}' },
 
   // ── Applications ──
-  { id: 'listApps', method: 'GET', path: '/api/projects/:projectId/apps', label: 'List Applications', description: 'List all applications (Deployments) in a project.', category: 'Applications' },
-  { id: 'createApp', method: 'POST', path: '/api/projects/:projectId/apps', label: 'Create Application', description: 'Create a new application (Deployment + Service) in a project.', category: 'Applications', bodyPlaceholder: '{"name": "my-app", "image": "nginx:latest", "port": 80, "replicas": 1, "env": {"NODE_ENV": "production"}}' },
+  { id: 'listApps', method: 'GET', path: '/api/projects/:projectId/apps', label: 'List Applications', description: 'List all applications in a project.', category: 'Applications' },
+  { id: 'createApp', method: 'POST', path: '/api/projects/:projectId/apps', label: 'Create Application', description: 'Create a new application in a project.', category: 'Applications', bodyPlaceholder: '{"name": "my-app", "image": "nginx:latest", "port": 80, "replicas": 1, "env": {"NODE_ENV": "production"}}' },
   { id: 'getApp', method: 'GET', path: '/api/projects/:projectId/apps/:name', label: 'Get Application', description: 'Get details for a specific application.', category: 'Applications' },
   { id: 'updateApp', method: 'PUT', path: '/api/projects/:projectId/apps/:name', label: 'Update Application', description: 'Update application image, env vars, or replicas.', category: 'Applications', bodyPlaceholder: '{"image": "nginx:1.25", "env": {"KEY": "value"}, "replicas": 2}' },
   { id: 'deleteApp', method: 'DELETE', path: '/api/projects/:projectId/apps/:name', label: 'Delete Application', description: 'Delete an application and its service.', category: 'Applications' },
-  { id: 'scaleApp', method: 'POST', path: '/api/projects/:projectId/apps/:name/scale', label: 'Scale Application', description: 'Scale application replicas up or down (0-10).', category: 'Applications', bodyPlaceholder: '{"replicas": 3}' },
+  { id: 'scaleApp', method: 'POST', path: '/api/projects/:projectId/apps/:name/scale', label: 'Scale Application', description: 'Scale application copies up or down (0-10).', category: 'Applications', bodyPlaceholder: '{"replicas": 3}' },
   { id: 'getAppLogs', method: 'GET', path: '/api/projects/:projectId/apps/:name/logs', label: 'Application Logs', description: 'Get stdout/stderr logs from the running application.', category: 'Applications' },
   { id: 'restartApp', method: 'POST', path: '/api/projects/:projectId/apps/:name/restart', label: 'Restart Application', description: 'Restart the application (scale to 0 then back to 1).', category: 'Applications' },
-  { id: 'deployGitHub', method: 'POST', path: '/api/projects/:projectId/apps/deploy-github', label: 'Deploy from GitHub', description: 'Auto-build and deploy from a GitHub repository. Detects framework, builds Docker image, deploys to K8s.', category: 'Applications', bodyPlaceholder: '{"name": "my-app", "repoURL": "https://github.com/username/repo.git", "branch": "main", "port": 3000}' },
+  { id: 'deployGitHub', method: 'POST', path: '/api/projects/:projectId/apps/deploy-github', label: 'Deploy from GitHub', description: 'Auto-build and deploy from a GitHub repository. Detects framework, builds image, deploys.', category: 'Applications', bodyPlaceholder: '{"name": "my-app", "repoURL": "https://github.com/username/repo.git", "branch": "main", "port": 3000}' },
   { id: 'getAppVariables', method: 'GET', path: '/api/projects/:projectId/apps/:name/variables', label: 'App Variables', description: 'Get environment variables for an application.', category: 'Applications' },
 
   // ── Databases ──
-  { id: 'listDatabaseOperators', method: 'GET', path: '/api/databases', label: 'List DB Operators', description: 'List available database operators and their status.', category: 'Databases' },
+  { id: 'listDatabaseOperators', method: 'GET', path: '/api/databases', label: 'List DB Management', description: 'List available database management systems and their status.', category: 'Databases' },
   { id: 'createDatabase', method: 'POST', path: '/api/databases', label: 'Create Database', description: 'Create a new database instance (PostgreSQL, MongoDB, MySQL, Redis).', category: 'Databases', bodyPlaceholder: '{"type": "postgresql", "name": "my-db", "namespace": "my-project", "size": "small"}' },
   { id: 'listDatabases', method: 'GET', path: '/api/databases/:namespace', label: 'List Databases', description: 'List all database instances in a namespace.', category: 'Databases' },
   { id: 'deleteDatabase', method: 'DELETE', path: '/api/databases/:namespace/:type/:name', label: 'Delete Database', description: 'Delete a database instance permanently.', category: 'Databases' },
@@ -65,8 +65,8 @@ const endpoints: Endpoint[] = [
   { id: 'getAdminUsers', method: 'GET', path: '/api/admin/users', label: 'Admin Users', description: 'List all registered users.', category: 'Admin' },
   { id: 'getAdminProjects', method: 'GET', path: '/api/admin/projects', label: 'Admin Projects', description: 'List all projects across all users.', category: 'Admin' },
   { id: 'getAdminHealth', method: 'GET', path: '/api/admin/health', label: 'Admin Health', description: 'Get infrastructure health status.', category: 'Admin' },
-  { id: 'getAdminCluster', method: 'GET', path: '/api/admin/cluster', label: 'Admin Cluster', description: 'Get Kubernetes cluster information.', category: 'Admin' },
-  { id: 'getAdminClusterPods', method: 'GET', path: '/api/admin/cluster/pods', label: 'Admin Cluster Pods', description: 'List all pods across all namespaces.', category: 'Admin' },
+  { id: 'getAdminCluster', method: 'GET', path: '/api/admin/cluster', label: 'Admin Cluster', description: 'Get cloud environment information.', category: 'Admin' },
+  { id: 'getAdminClusterPods', method: 'GET', path: '/api/admin/cluster/pods', label: 'Admin Cluster Services', description: 'List all services across all projects.', category: 'Admin' },
 
   // ── System ──
   { id: 'healthCheck', method: 'GET', path: '/api/health', label: 'Health Check', description: 'Basic health check endpoint.', category: 'System' },

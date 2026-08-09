@@ -26,33 +26,33 @@ const TEMPLATES = [
 const features = [
   {
     icon: Container,
-    title: 'K3s Kubernetes Cluster',
-    desc: 'Lightweight, certified Kubernetes distribution running on your own infrastructure with full API compatibility.',
+    title: 'Managed Cloud Engine',
+    desc: 'High-performance cloud infrastructure with auto-scaling, load balancing, and full API compatibility.',
   },
   {
     icon: Database,
-    title: 'Cloud-Native Databases',
-    desc: 'PostgreSQL via CloudNativePG, MongoDB via Percona, and Redis via Spotahome operators — all production-grade.',
+    title: 'Managed Databases',
+    desc: 'PostgreSQL, MongoDB, and Redis — fully managed with automatic backups, failover, and monitoring.',
   },
   {
     icon: LayoutTemplate,
-    title: 'GitOps with ArgoCD',
-    desc: 'Declarative deployments via Git. Push code and ArgoCD syncs your Kubernetes cluster automatically.',
+    title: 'Git-Based Deployments',
+    desc: 'Push code to Git and it goes live automatically. Roll back to any version in seconds.',
   },
   {
     icon: ShieldCheck,
-    title: 'Auto TLS & Ingress',
-    desc: 'Traefik ingress controller with automatic Let\'s Encrypt certificates. Zero-config HTTPS on every service.',
+    title: 'Auto SSL & Routing',
+    desc: 'Automatic HTTPS certificates on every service. Smart traffic routing with zero configuration.',
   },
   {
     icon: HardDrive,
-    title: 'Longhorn Persistent Volumes',
-    desc: 'Distributed block storage that survives node failures. Resize volumes on the fly without downtime.',
+    title: 'Reliable Storage',
+    desc: 'Redundant storage that keeps your data safe. Resize volumes on the fly without downtime.',
   },
   {
     icon: Server,
-    title: 'Harbor Container Registry',
-    desc: 'Private Docker image registry with vulnerability scanning, RBAC, and image signing built in.',
+    title: 'Private Container Registry',
+    desc: 'Store and manage your app images privately with vulnerability scanning and access controls.',
   },
 ];
 
@@ -73,20 +73,19 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center max-w-3xl mx-auto flex flex-col items-center">
             <span className="inline-flex items-center gap-2 bg-[#00a2ff]/15 border border-[#00a2ff]/30 text-[#00c0ff] text-xs font-bold px-3 py-1.5 mb-6 uppercase tracking-wider font-mono">
-              <Sparkles className="w-3.5 h-3.5" /> Kubernetes-Powered
+              <Sparkles className="w-3.5 h-3.5" /> Cloud-Powered
             </span>
 
             <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.05] font-display">
-              Enterprise Kubernetes
+              Enterprise Hosting
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#00c0ff] to-cyan-200">
                 without the complexity.
               </span>
             </h1>
 
             <p className="mt-6 text-base sm:text-lg text-slate-200 max-w-2xl leading-relaxed">
-              DigiWise runs a full K3s cluster with Traefik ingress, Longhorn storage,
-              ArgoCD GitOps, and managed databases via CloudNativePG, Percona and Spotahome operators.
-              Deploy to production in seconds.
+              DigiWise runs a fully managed cloud platform with auto-SSL, reliable storage,
+              Git-based deployments, and managed databases. Deploy to production in seconds.
             </p>
 
             <div className="mt-9 flex flex-col sm:flex-row gap-4">
@@ -94,7 +93,7 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
                 onClick={() => onSelectPlan('Trial', 0)}
                 className="bg-[#00c0ff] hover:bg-white text-[#002866] font-bold text-sm px-8 py-3.5 transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
-                <Rocket className="w-4 h-4" /> Deploy on Kubernetes
+                <Rocket className="w-4 h-4" /> Deploy Your App
               </button>
               <button
                 onClick={() => scrollTo('pricing')}
@@ -106,8 +105,8 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
 
             <div className="mt-8 flex flex-wrap justify-center gap-6 text-xs text-slate-200">
               <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> No credit card required</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Full K8s API access</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> GitOps with ArgoCD</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Full API access</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Git-based deployments</span>
             </div>
           </div>
 
@@ -118,16 +117,15 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
                 <span className="w-3 h-3 bg-rose-400"></span>
                 <span className="w-3 h-3 bg-amber-400"></span>
                 <span className="w-3 h-3 bg-emerald-400"></span>
-                <span className="ml-3 text-[10px] text-slate-500 font-mono">kubectl — production cluster</span>
+                <span className="ml-3 text-[10px] text-slate-500 font-mono">digiwise — production environment</span>
               </div>
               <div className="p-5 text-xs font-mono leading-relaxed bg-[#f8fafc]">
-                <p className="text-slate-500"><span className="text-emerald-600">$</span> kubectl get pods -n digiwise-prod</p>
-                <p className="text-slate-700 mt-1"><span className="text-[#00459c]">✓</span> NAME                          READY   STATUS</p>
-                <p className="text-slate-700"><span className="text-[#00459c]">✓</span> api-deployment-7f8b9c-xk2     1/1     Running</p>
-                <p className="text-slate-700"><span className="text-[#00459c]">✓</span> postgres-cnpg-cluster-0       1/1     Running</p>
-                <p className="text-slate-700"><span className="text-[#00459c]">✓</span> redis-spotahome-0             1/1     Running</p>
-                <p className="mt-1 text-slate-900"><span className="text-emerald-600">→</span> ArgoCD sync <span className="text-[#00459c] font-bold">digiwise-prod</span> — all healthy</p>
-                <p className="text-slate-400">Cluster: k3s v1.31 · Nodes: 3 · CPU: 47% · Memory: 62%</p>
+                <p className="text-slate-500"><span className="text-emerald-600">$</span> digiwise status --env production</p>
+                <p className="text-slate-700 mt-1"><span className="text-[#00459c]">✓</span> api              Running</p>
+                <p className="text-slate-700"><span className="text-[#00459c]">✓</span> postgresql       Running</p>
+                <p className="text-slate-700"><span className="text-[#00459c]">✓</span> redis            Running</p>
+                <p className="mt-1 text-slate-900"><span className="text-emerald-600">→</span> All services synced <span className="text-[#00459c] font-bold">production</span> — healthy</p>
+                <p className="text-slate-400">Engine: K3s v1.31 · Nodes: 3 · CPU: 47% · Memory: 62%</p>
               </div>
             </div>
           </div>
@@ -139,10 +137,10 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: 'K3s', label: 'Kubernetes Distribution' },
+              { value: 'K3s', label: 'Cloud Engine' },
               { value: '99.99%', label: 'Uptime SLA' },
-              { value: '3', label: 'Database Operators' },
-              { value: '100%', label: 'K8s API Compatible' },
+              { value: '3', label: 'Database Types' },
+              { value: '100%', label: 'API Compatible' },
             ].map((stat) => (
               <div key={stat.label}>
                 <div className="text-3xl font-extrabold text-[#00459c] font-mono">{stat.value}</div>
@@ -159,10 +157,10 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">Platform</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-display">
-              Full Kubernetes stack, managed for you
+              Full hosting stack, managed for you
             </h2>
             <p className="mt-3 text-slate-500 text-sm sm:text-base leading-relaxed">
-              Every component — cluster, ingress, storage, registry, GitOps and databases — runs on Kubernetes with production defaults.
+              Every component — cloud engine, SSL, storage, registry, deployments and databases — managed with production defaults.
             </p>
           </div>
 
@@ -190,10 +188,10 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
             <div className="max-w-xl">
               <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">Templates</span>
               <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">
-                One-click Kubernetes deployments
+                One-click deployments
               </h2>
               <p className="mt-3 text-slate-500 text-sm leading-relaxed">
-                Full-stack apps, APIs, microservices and managed data stores — deployed as K8s workloads in under a minute.
+                Full-stack apps, APIs, microservices and managed databases — deployed and running in under a minute.
               </p>
             </div>
             <button
@@ -227,36 +225,36 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
             <div>
-              <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">Database Operators</span>
+              <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">Managed Databases</span>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-display">
-                Cloud-native databases on Kubernetes
+                Production databases, zero hassle
               </h2>
               <p className="mt-4 text-slate-500 text-sm sm:text-base leading-relaxed max-w-lg">
-                Production-grade database clusters managed by Kubernetes operators. Automatic failover,
-                daily backups, and private networking — all running on your K3s cluster.
+                Managed database clusters with automatic failover,
+                daily backups, and private networking — all running on your cloud environment.
               </p>
               <div className="mt-7 flex flex-col gap-3 text-sm text-slate-700">
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                  <span>CloudNativePG for PostgreSQL high-availability</span>
+                  <span>PostgreSQL with high-availability and auto-failover</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                  <span>Percona operator for MongoDB sharded clusters</span>
+                  <span>MongoDB with sharding and replication</span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                  <span>Spotahome operator for Redis Sentinel</span>
+                  <span>Redis with Sentinel-based high availability</span>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { name: 'PostgreSQL', sub: 'CloudNativePG', desc: 'Streaming replication, automated failover and point-in-time recovery.', color: 'text-sky-600' },
-                { name: 'MongoDB', sub: 'Percona Operator', desc: 'Sharded clusters with Config Servers and Mongos routers.', color: 'text-emerald-600' },
-                { name: 'Redis', sub: 'Spotahome Operator', desc: 'Sentinel-based HA with automatic failover and persistence.', color: 'text-rose-600' },
-                { name: 'Longhorn', sub: 'Distributed Storage', desc: 'Replicated block storage across all cluster nodes.', color: 'text-purple-600' },
+                { name: 'PostgreSQL', sub: 'Managed PostgreSQL', desc: 'Automatic failover, daily backups and point-in-time recovery.', color: 'text-sky-600' },
+                { name: 'MongoDB', sub: 'Managed MongoDB', desc: 'Sharded clusters with automatic scaling and replication.', color: 'text-emerald-600' },
+                { name: 'Redis', sub: 'Managed Redis', desc: 'High-availability caching with automatic failover and persistence.', color: 'text-rose-600' },
+                { name: 'Storage', sub: 'Reliable Storage', desc: 'Redundant block storage across all nodes.', color: 'text-purple-600' },
               ].map((db) => (
                 <div key={db.name} className="bg-white border border-slate-200 p-5 hover:border-[#00459c]/40 hover:shadow-sm transition-all">
                   <div className="flex items-center justify-between">
@@ -302,10 +300,10 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
               <div className="my-6 border-t border-slate-100"></div>
 
               <ul className="text-left space-y-3 text-xs text-slate-600">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Full K3s cluster</strong> — Kubernetes, Traefik, Longhorn, ArgoCD</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Full cloud stack</strong> — cloud engine, SSL, storage, deployments, databases</span></li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">30-day free trial</strong> — full platform for 30 days, no card required</span></li>
                 <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Then upgrade</strong> — flat $10/mo, unlimited services</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Everything included</strong> — TLS, GitOps, databases, monitoring, zero config</span></li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Everything included</strong> — SSL, Git deployments, databases, monitoring, zero config</span></li>
               </ul>
 
               <button
@@ -322,7 +320,7 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
             <div className="bg-slate-50 border border-slate-200 p-5 text-center">
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Free Trial</div>
               <div className="mt-1 text-xl font-extrabold text-slate-900 font-mono">$0<span className="text-xs text-slate-500 font-medium"> · 30 days</span></div>
-              <div className="text-[11px] text-slate-500 mt-1">Up to 4 services, full K8s stack</div>
+              <div className="text-[11px] text-slate-500 mt-1">Up to 4 services, full cloud stack</div>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-5 text-center">
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pro</div>
@@ -352,17 +350,17 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
             <Rocket className="inline w-4 h-4 -mt-0.5 mr-1.5" /> Get started in seconds
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight font-display">
-            Ship on Kubernetes. We handle the rest.
+            Ship your app. We handle the rest.
           </h2>
           <p className="mt-4 text-slate-200 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            Join developers deploying on DigiWise Kubernetes. Free to start — deploy your first app in under 60 seconds.
+            Join developers deploying on DigiWise. Free to start — deploy your first app in under 60 seconds.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row justify-center gap-4">
             <button
               onClick={() => onSelectPlan('Trial', 0)}
               className="bg-white text-[#00459c] font-bold text-sm px-9 py-3.5 transition-colors cursor-pointer flex items-center justify-center gap-2 hover:bg-slate-50"
             >
-              <Rocket className="w-4 h-4" /> Deploy on Kubernetes
+              <Rocket className="w-4 h-4" /> Deploy Your App
             </button>
             <button
               onClick={() => scrollTo('features')}

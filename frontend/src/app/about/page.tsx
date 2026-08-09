@@ -18,12 +18,12 @@ export default function AboutPage() {
             <Container className="w-3.5 h-3.5" /> About DigiWise
           </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight font-display">
-            We run Kubernetes
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#00c0ff] to-cyan-200">so you don't have to.</span>
+            We handle the servers
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#00c0ff] to-cyan-200">so you can focus on building.</span>
           </h1>
           <p className="text-base sm:text-lg text-slate-200 max-w-2xl mx-auto leading-relaxed mt-5">
-            DigiWise is a Kubernetes-native cloud platform that deploys applications, databases and sites
-            on a fully managed K3s cluster — so developers can ship code without thinking about infrastructure.
+            DigiWise is a cloud platform that deploys your applications, databases and websites
+            on a fully managed infrastructure — so you can ship code without worrying about servers.
           </p>
         </div>
       </section>
@@ -32,9 +32,9 @@ export default function AboutPage() {
       <section className="border-b border-slate-200 bg-white py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {[
-            { icon: Container, value: 'K3s', label: 'K8s Distribution' },
-            { icon: Users, value: '5M+', label: 'Containers Deployed' },
-            { icon: Boxes, value: '100%', label: 'K8s API Compatible' },
+            { icon: Container, value: 'K3s', label: 'Cloud Engine' },
+            { icon: Users, value: '5M+', label: 'Apps Deployed' },
+            { icon: Boxes, value: '100%', label: 'API Compatible' },
             { icon: Shield, value: '99.99%', label: 'Uptime SLA' },
           ].map((stat) => {
             const Icon = stat.icon;
@@ -56,26 +56,26 @@ export default function AboutPage() {
             <div>
               <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">Our Mission</span>
               <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight font-display leading-tight">
-                Enterprise Kubernetes, accessible to everyone.
+                Enterprise-grade hosting, accessible to everyone.
               </h2>
               <p className="mt-5 text-slate-500 text-sm sm:text-base leading-relaxed">
-                We believe Kubernetes shouldn't require a platform team. DigiWise bundles K3s, Traefik,
-                Longhorn, ArgoCD, Harbor and MinIO into a single managed cluster — giving every developer
-                the power of cloud-native infrastructure without the operational burden.
+                We believe hosting shouldn't require a DevOps team. DigiWise bundles auto-scaling, load balancing,
+                SSL certificates, database management and backup into a single managed platform — giving every developer
+                the power of enterprise infrastructure without the complexity.
               </p>
               <p className="mt-4 text-slate-500 text-sm sm:text-base leading-relaxed">
-                From a startup deploying its first microservice to an enterprise running stateful workloads
-                at scale, DigiWise provides the Kubernetes primitives, database operators and GitOps workflows
+                From a startup deploying its first app to a business running multiple services
+                at scale, DigiWise provides the tools, managed databases and deployment workflows
                 teams need to move fast without breaking things.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { icon: Container, title: 'K3s Cluster', desc: 'Certified lightweight Kubernetes with full API compatibility and minimal overhead.' },
-                { icon: GitBranch, title: 'GitOps with ArgoCD', desc: 'Declarative deployments synced from Git. Rollbacks in seconds.' },
-                { icon: Server, title: 'Traefik Ingress', desc: 'Auto-discovering ingress controller with automatic TLS certificates.' },
-                { icon: Shield, title: 'Longhorn Storage', desc: 'Distributed block storage that survives node failures across the cluster.' },
+                { icon: Container, title: 'Managed Cloud Engine', desc: 'High-performance cloud infrastructure with full API compatibility and minimal overhead.' },
+                { icon: GitBranch, title: 'Git-Based Deployments', desc: 'Push code and it goes live automatically. Roll back to any version in seconds.' },
+                { icon: Server, title: 'Auto SSL & Load Balancing', desc: 'Automatic HTTPS certificates and smart traffic routing across your apps.' },
+                { icon: Shield, title: 'Reliable Storage', desc: 'Redundant storage that keeps your data safe even if hardware fails.' },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
@@ -100,9 +100,9 @@ export default function AboutPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { title: 'Kubernetes Without Complexity', desc: 'Every feature starts with a developer who shouldn\'t need a K8s certification. If it isn\'t simple, it isn\'t done.' },
-              { title: 'Cloud-Native by Default', desc: 'Operators, CRDs and declarative config are the foundation. Your infrastructure is version-controlled and reproducible.' },
-              { title: 'Full Transparency', desc: 'Status pages, live metrics and clear pricing. You always know exactly what\'s running in your cluster.' },
+              { title: 'Simple by Default', desc: 'Every feature starts with a developer who just wants to deploy. If it isn\'t simple, it isn\'t done.' },
+              { title: 'Cloud-Native by Design', desc: 'Auto-scaling, health checks and managed databases are built in. Your apps run reliably from day one.' },
+              { title: 'Full Transparency', desc: 'Status pages, live metrics and clear pricing. You always know exactly what\'s running and what it costs.' },
             ].map((val) => (
               <div key={val.title} className="bg-slate-50 border border-slate-200 p-7 hover:border-[#00459c]/40 transition-all">
                 <div className="w-9 h-9 bg-[#00459c]/10 text-[#00459c] flex items-center justify-center mb-5">
@@ -119,9 +119,9 @@ export default function AboutPage() {
       {/* CTA */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">Deploy on Kubernetes today</h2>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">Deploy your app today</h2>
           <p className="mt-4 text-slate-500 text-sm leading-relaxed">
-            Get a full K3s cluster with Traefik, Longhorn, ArgoCD and managed databases — running in under 60 seconds.
+            Get a fully managed cloud environment with auto-SSL, databases and scaling — running in under 60 seconds.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
             <button
