@@ -294,11 +294,11 @@ export async function databaseRoutes(app: FastifyInstance) {
     }
   });
 
-  // Migrate data from external MongoDB (e.g. Railway) into this database
+  // Migrate data from external database (e.g. Railway) into this database
   app.post<{ Params: { namespace: string; type: string; name: string }; Body: { sourceUri: string } }>('/api/databases/:namespace/:type/:name/migrate', {
     schema: {
       tags: ['Databases'],
-      description: 'Migrate data from an external MongoDB (e.g. Railway) into this database instance',
+      description: 'Migrate data from an external database (e.g. Railway, Atlas) into this database instance',
       params: {
         type: 'object',
         properties: {
@@ -311,7 +311,7 @@ export async function databaseRoutes(app: FastifyInstance) {
         type: 'object',
         required: ['sourceUri'],
         properties: {
-          sourceUri: { type: 'string', description: 'MongoDB connection URI from Railway or other provider' },
+          sourceUri: { type: 'string', description: 'Database connection URI from Railway, Atlas, or other provider' },
         },
       },
       security: [{ bearerAuth: [] }],
@@ -322,8 +322,8 @@ export async function databaseRoutes(app: FastifyInstance) {
     const { namespace, type, name } = request.params;
     const { sourceUri } = request.body;
 
-    if (type !== 'mongodb') {
-      return reply.status(400).send({ error: 'Migration is currently only supported for MongoDB' });
+    if (type !== 'mongodb' && type !== 'postgresql') {
+      return reply.status(400).send({ error: 'Migration is currently supported for MongoDB and PostgreSQL' });
     }
 
     // Verify ownership
@@ -337,17 +337,24 @@ export async function databaseRoutes(app: FastifyInstance) {
 
     // Get target connection details
     const vars = await getDatabaseVariables(namespace, type, name);
-    const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
-    // Find the MongoDB pod
+    // Find the database pod
     let podName = '';
     try {
+      let labelSelector = '';
+      if (type === 'mongodb') {
+        labelSelector = `app.kubernetes.io/name=${name},app.kubernetes.io/component=rs0`;
+      } else if (type === 'postgresql') {
+        labelSelector = `cnpg.io/cluster=${name}`;
+      }
+
       const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({
         namespace,
-        labelSelector: `app.kubernetes.io/name=${name},app.kubernetes.io/component=rs0`,
+        ...(labelSelector ? { labelSelector } : {}),
       });
       const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
-      podName = items[0]?.metadata?.name || '';
+      const running = items.find((p: any) => p.status?.phase === 'Running');
+      podName = running?.metadata?.name || items[0]?.metadata?.name || '';
     } catch {
       // Fallback: try listing pods with name filter
       try {
@@ -359,24 +366,41 @@ export async function databaseRoutes(app: FastifyInstance) {
     }
 
     if (!podName) {
-      return reply.status(404).send({ error: 'MongoDB pod not found. Is the database running?' });
+      return reply.status(404).send({ error: `${type === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} pod not found. Is the database running?` });
     }
 
     try {
-      // Run mongodump from source URI into the pod's tmp directory
       const dumpDir = `/tmp/migration-${Date.now()}`;
 
-      // Step 1: mongodump from source (Railway)
-      const dumpCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mkdir -p ${dumpDir} && mongodump --uri=\\"${sourceUri}\\" --out=${dumpDir} --gzip"`;
-      execSync(dumpCmd, { timeout: 300000, encoding: 'utf-8' });
+      if (type === 'mongodb') {
+        // MongoDB: mongodump + mongorestore
+        const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
-      // Step 2: mongorestore into target
-      const restoreCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mongorestore --uri=\\"${targetUri}\\" --dir=${dumpDir} --gzip --drop"`;
-      execSync(restoreCmd, { timeout: 300000, encoding: 'utf-8' });
+        const dumpCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mkdir -p ${dumpDir} && mongodump --uri=\\"${sourceUri}\\" --out=${dumpDir} --gzip"`;
+        execSync(dumpCmd, { timeout: 300000, encoding: 'utf-8' });
 
-      // Step 3: Cleanup
-      const cleanupCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "rm -rf ${dumpDir}"`;
-      execSync(cleanupCmd, { timeout: 30000, encoding: 'utf-8' });
+        const restoreCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mongorestore --uri=\\"${targetUri}\\" --dir=${dumpDir} --gzip --drop"`;
+        execSync(restoreCmd, { timeout: 300000, encoding: 'utf-8' });
+
+        execSync(`kubectl exec -n ${namespace} ${podName} -- bash -c "rm -rf ${dumpDir}"`, { timeout: 30000, encoding: 'utf-8' });
+      } else if (type === 'postgresql') {
+        // PostgreSQL: pg_dump + pg_restore
+        const dumpFile = `${dumpDir}/dump.sql`;
+
+        const dumpCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mkdir -p ${dumpDir} && pg_dump \\"${sourceUri}\\" > ${dumpFile}"`;
+        execSync(dumpCmd, { timeout: 300000, encoding: 'utf-8' });
+
+        const targetHost = vars.host;
+        const targetPort = vars.port;
+        const targetUser = vars.username;
+        const targetPass = vars.password;
+        const targetDb = vars.databaseName;
+
+        const restoreCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "PGPASSWORD=\\"${targetPass}\\" pg_restore -h ${targetHost} -p ${targetPort} -U ${targetUser} -d ${targetDb} --clean --if-exists < ${dumpFile}"`;
+        execSync(restoreCmd, { timeout: 300000, encoding: 'utf-8' });
+
+        execSync(`kubectl exec -n ${namespace} ${podName} -- bash -c "rm -rf ${dumpDir}"`, { timeout: 30000, encoding: 'utf-8' });
+      }
 
       return reply.status(200).send({
         success: true,
@@ -389,10 +413,12 @@ export async function databaseRoutes(app: FastifyInstance) {
       });
     } catch (err: any) {
       const errMsg = err.stderr || err.message || 'Migration failed';
+      const toolName = type === 'mongodb' ? 'mongodump' : 'pg_dump';
+      const restoreName = type === 'mongodb' ? 'mongorestore' : 'pg_restore';
       return reply.status(500).send({
         error: 'Migration failed',
-        details: errMsg.includes(' mongodump') ? 'Failed to dump data from source. Check your connection string.' :
-                 errMsg.includes(' mongorestore') ? 'Failed to restore data to target. Check if the target database is accessible.' :
+        details: errMsg.includes(toolName) ? `Failed to dump data from source. Check your connection string.` :
+                 errMsg.includes(restoreName) ? `Failed to restore data to target. Check if the target database is accessible.` :
                  errMsg,
       });
     }
