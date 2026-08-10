@@ -247,7 +247,7 @@ export default function ConsoleShell() {
   const [planLoading, setPlanLoading] = useState(true);
   const { user, logout } = useAuth();
 
-  const hasPaidPlan = plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active';
+  const hasPaidPlan = user?.role === 'admin' || (plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active');
 
   const refresh = useCallback(async () => {
     setError('');
@@ -521,7 +521,7 @@ export default function ConsoleShell() {
 
           <main className="flex-1 overflow-y-auto p-4 lg:p-8">
             <div className="max-w-6xl mx-auto">
-              {!hasPaidPlan && !planLoading && user?.role !== 'admin' && (
+              {!hasPaidPlan && !planLoading && (
                 <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-5 flex items-center gap-4">
                   <div className="w-10 h-10 bg-amber-100 flex items-center justify-center shrink-0">
                     <ShoppingCart className="w-5 h-5 text-amber-600" />

@@ -5,6 +5,7 @@ import {
   Server, Settings, Globe, ShoppingCart, ListOrdered, Link2
 } from 'lucide-react';
 import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 interface EmailAccount {
   address: string;
@@ -148,6 +149,7 @@ const EMAIL_CLIENTS: SetupGuide[] = [
 ];
 
 export default function EmailView() {
+  const { user } = useAuth();
   const [plan, setPlan] = useState<any>(null);
   const [planLoading, setPlanLoading] = useState(true);
   const [emails, setEmails] = useState<EmailAccount[]>([]);
@@ -163,7 +165,7 @@ export default function EmailView() {
     api.getPlan().then(p => setPlan(p)).catch(() => setPlan(null)).finally(() => setPlanLoading(false));
   }, []);
 
-  const hasPaidPlan = plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active';
+  const hasPaidPlan = user?.role === 'admin' || (plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active');
 
   const handleCreateEmail = (e: React.FormEvent) => {
     e.preventDefault();
