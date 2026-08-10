@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
-import BillingView from '../../components/BillingView';
+import { useEffect } from 'react';
 
 export default function BillingPage() {
-  return <BillingView />;
+  useEffect(() => {
+    window.location.href = '/console';
+  }, []);
+  return null;
 }

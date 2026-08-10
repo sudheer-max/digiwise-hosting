@@ -321,7 +321,7 @@ class ApiClient {
     return this.request(`/databases/${namespace}/${type}/${name}/migrate`, {
       method: 'POST',
       body: JSON.stringify({ sourceUri }),
-    });
+    }, 600000);
   }
 
   // === GITHUB DEPLOY ===

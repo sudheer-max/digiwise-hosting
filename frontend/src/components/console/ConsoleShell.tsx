@@ -229,7 +229,7 @@ export default function ConsoleShell() {
   const initialRoute = (() => {
     if (typeof window !== 'undefined') {
       const view = new URLSearchParams(window.location.search).get('view');
-      const valid = ['projects', 'templates', 'usage', 'plans', 'billing', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview'];
+      const valid = ['projects', 'templates', 'usage', 'plans', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview'];
       if (view && valid.includes(view)) return { name: view } as Route;
     }
     return { name: 'overview' } as Route;
@@ -255,6 +255,12 @@ export default function ConsoleShell() {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (route.name === 'billing') {
+      setRoute({ name: 'overview' });
+    }
+  }, [route.name]);
 
   const navigate = useCallback((r: Route) => {
     setRoute(r);
@@ -294,6 +300,7 @@ export default function ConsoleShell() {
         { key: 'settings', label: 'General', icon: <Settings className="w-4 h-4" />, route: { name: 'settings' } as Route, active: route.name === 'settings' },
         { key: 'plans', label: 'Plans', icon: <Sparkles className="w-4 h-4" />, route: { name: 'plans' } as Route, active: route.name === 'plans' },
         { key: 'billing', label: 'Billing', icon: <CreditCard className="w-4 h-4" />, route: { name: 'billing' } as Route, active: route.name === 'billing' },
+
         { key: 'webServer', label: 'Domains', icon: <Globe2 className="w-4 h-4" />, route: { name: 'webServer' } as Route, active: route.name === 'webServer' },
         { key: 'auditLogs', label: 'Audit Logs', icon: <ScrollText className="w-4 h-4" />, route: { name: 'auditLogs' } as Route, active: route.name === 'auditLogs' },
       ],
@@ -369,7 +376,7 @@ export default function ConsoleShell() {
       case 'whitelabel': return <WhitelabelView />;
       case 'plans': return <PlansView />;
       case 'usage': return <UsageView />;
-      case 'billing': return <BillingView />;
+      case 'billing': return <OverviewView />;
       case 'templates': return <TemplatesView />;
       case 'people': return <PeopleView />;
       case 'earnings': return <EarningsView />;

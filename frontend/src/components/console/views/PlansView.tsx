@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Check, Loader2, RefreshCw, Zap, ArrowRight } from 'lucide-react';
+import { Sparkles, Check, Loader2, RefreshCw, Zap, ArrowRight, Cpu, HardDrive, Server, Network } from 'lucide-react';
 import api from '../../../lib/api';
 import { SectionHeader, Card, ErrorBanner, PrimaryButton, GhostButton } from '../ui';
 
 interface PlanData {
-  plan: { key: string; name: string; price: number; serviceLimit: number; unlimited?: boolean; description: string };
+  plan: { key: string; name: string; price: number; serviceLimit: number; unlimited?: boolean; description: string; specs?: { vcpu: number; ram: string; disk: string; bandwidth: string }; renewsAt?: number };
   planStatus: string;
   planRenewsAt?: string | null;
   trial?: { daysLeft: number; endsAt: string };
@@ -58,7 +58,7 @@ export default function PlansView() {
         amount: order.amount,
         currency: order.currency,
         name: 'DigiWise Cloud',
-        description: `${order.planName} plan · $${(order.amount / 100).toFixed(2)}/mo`,
+        description: `${order.planName} plan`,
         order_id: order.razorpayOrderId,
         handler: (r: any) => {
           const qs = new URLSearchParams({
@@ -77,17 +77,14 @@ export default function PlansView() {
     }
   };
 
-  const progress = data?.usage
-    ? data.usage.unlimited ? 0 : Math.min(100, Math.round((data.usage.total / Math.max(1, data.usage.limit)) * 100))
-    : 0;
   const isActive = data?.planStatus === 'active';
   const isTrial = data?.planStatus === 'trial';
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Plans"
-        subtitle="Choose a plan to keep your services running."
+        title="VPS Hosting Plans"
+        subtitle="Choose a plan that fits your workload."
         action={<GhostButton onClick={load}><RefreshCw className="w-3.5 h-3.5" /> Refresh</GhostButton>}
       />
 
@@ -95,7 +92,7 @@ export default function PlansView() {
       {payError && <ErrorBanner message={payError} />}
 
       {loading && !data ? (
-        <div className="flex items-center justify-center py-16 text-slate-400 text-sm"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading plan...</div>
+        <div className="flex items-center justify-center py-16 text-slate-400 text-sm"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading plans...</div>
       ) : data ? (
         <>
           {/* Current plan banner */}
@@ -118,7 +115,7 @@ export default function PlansView() {
 
               <div className="shrink-0">
                 <div className="text-3xl font-display font-bold text-slate-900">
-                  {data.plan.price > 0 ? `$${data.plan.price}` : 'Free'}
+                  {data.plan.price > 0 ? `₹${data.plan.price}` : 'Free'}
                   {data.plan.price > 0 && <span className="text-sm text-slate-400 font-medium">/mo</span>}
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
@@ -128,66 +125,56 @@ export default function PlansView() {
             </div>
           </Card>
 
-          {/* Usage progress */}
-          {data.usage && (
-            <Card title="Service Usage" icon={<Zap className="w-4 h-4 text-[#00459c]" />}>
-              <div className="flex items-end justify-between mb-2">
-                <div className="text-sm text-slate-600">
-                  <span className="text-2xl font-display font-bold text-slate-900">{data.usage.total}</span>
-                  <span className="text-slate-400"> / {data.usage.limit} services</span>
-                </div>
-                <div className="text-[11px] font-bold text-slate-400">
-                  {data.usage.apps} apps · {data.usage.dbs} databases · {data.usage.composes} composes
-                </div>
-              </div>
-              <div className="h-2 bg-slate-100 overflow-hidden">
-                <div className={`h-full transition-all ${progress >= 100 ? 'bg-rose-500' : progress >= 80 ? 'bg-amber-500' : 'bg-[#00459c]'}`} style={{ width: `${data.usage.unlimited ? 100 : progress}%` }} />
-              </div>
-              {data.usage.unlimited ? (
-                <div className="mt-3 text-xs text-slate-400">Unlimited service slots on your current plan.</div>
-              ) : data.usage.remaining === 0 ? (
-                <div className="mt-3 text-xs font-semibold text-rose-600">Limit reached — upgrade to add more services.</div>
-              ) : (
-                <div className="mt-3 text-xs text-slate-400">{data.usage.remaining} service slots available.</div>
-              )}
-            </Card>
-          )}
-
-          {/* Plan cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {(data.plans || []).map((p) => {
+          {/* VPS Plan cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {(data.plans || []).filter(p => p.key !== 'trial').map((p) => {
               const current = p.key === data.plan.key;
-              const featured = p.key === 'pro';
+              const featured = p.highlighted;
               return (
                 <div
                   key={p.key}
                   className={`relative bg-white border p-6 flex flex-col justify-between transition-all ${
-                    featured ? 'border-[#00459c] ring-2 ring-[#00459c]/15 shadow-md' : 'border-slate-200'
-                  } ${current ? 'opacity-90' : 'hover:border-[#00459c]/40'}`}
+                    featured ? 'border-[#7c3aed] ring-2 ring-[#7c3aed]/15 shadow-md' : 'border-slate-200 hover:border-[#00459c]/40 hover:shadow-sm'
+                  } ${current ? 'opacity-90' : ''}`}
                 >
                   {featured && (
-                    <span className="absolute -translate-y-7 translate-x-1/2 right-1/2 bg-[#00459c] text-white text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider whitespace-nowrap">
-                      Recommended
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#7c3aed] text-white text-[9px] font-bold px-3 py-1 uppercase tracking-wider whitespace-nowrap">
+                      Most Popular
                     </span>
                   )}
                   <div>
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{p.name}</div>
-                    <div className="mt-2 text-2xl font-display font-bold text-slate-900">
-                      {p.price > 0 ? `$${p.price}` : 'Free'}
-                      {p.price > 0 && <span className="text-xs text-slate-400 font-medium">/mo</span>}
+                    <div className="mt-2 flex items-baseline">
+                      <span className="text-3xl font-display font-bold text-slate-900">₹{p.price}</span>
+                      <span className="text-sm text-slate-400 font-medium ml-1">/mo</span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">{p.description}</p>
+
+                    {p.specs && (
+                      <div className="mt-4 border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
+                        <div className="flex items-center gap-2"><Cpu className="w-3.5 h-3.5 text-slate-400" /> {p.specs.vcpu} vCPU core{p.specs.vcpu > 1 ? 's' : ''}</div>
+                        <div className="flex items-center gap-2"><HardDrive className="w-3.5 h-3.5 text-slate-400" /> {p.specs.ram} RAM</div>
+                        <div className="flex items-center gap-2"><Server className="w-3.5 h-3.5 text-slate-400" /> {p.specs.disk}</div>
+                        <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5 text-slate-400" /> {p.specs.bandwidth} bandwidth</div>
+                      </div>
+                    )}
+
+                    {p.renewsAt && (
+                      <div className="mt-3 text-[11px] text-slate-400">
+                        Renews at ₹{p.renewsAt}/mo
+                      </div>
+                    )}
                   </div>
                   <div className="mt-5">
                     {current ? (
-                      <div className="w-full text-center text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 py-2.5 rounded">
+                      <div className="w-full text-center text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 py-2.5">
                         <Check className="w-3.5 h-3.5 inline mr-1" /> Current plan
                       </div>
                     ) : p.price === 0 ? (
                       <GhostButton className="w-full justify-center" onClick={() => load()}>Manage</GhostButton>
                     ) : (
                       <PrimaryButton className="w-full justify-center" onClick={() => upgrade(p.key)} disabled={!!paying}>
-                        {paying === p.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />} Upgrade
+                        {paying === p.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />} Choose plan
                       </PrimaryButton>
                     )}
                   </div>

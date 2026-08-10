@@ -49,7 +49,7 @@ export async function planRoutes(app: FastifyInstance) {
       headers: { 'Content-Type': 'application/json', Authorization: `Basic ${auth}` },
       body: JSON.stringify({
         amount,
-        currency: 'USD',
+        currency: 'INR',
         receipt,
         notes: {
           userId: user.id,
@@ -68,7 +68,7 @@ export async function planRoutes(app: FastifyInstance) {
       plan,
       planName: def.name,
       amount,
-      currency: 'USD',
+      currency: 'INR',
       razorpayOrderId: razorpayOrder.id,
     };
   });

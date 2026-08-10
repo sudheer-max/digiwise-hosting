@@ -274,70 +274,61 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
       <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-white border-y border-slate-200">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">Pricing</span>
+            <span className="text-[#00459c] text-xs font-bold uppercase tracking-widest block mb-3 font-mono">VPS Hosting</span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-display">
-              One flat plan. Unlimited services.
+              High-performance VPS plans
             </h2>
             <p className="mt-3 text-slate-500 text-sm sm:text-base leading-relaxed">
-              No per-VM prices, no surprises. Every account starts free and includes 4 services
-              for 30 days — then a flat $10/month keeps everything running, unlimited.
+              Choose a VPS plan that fits your workload. Every plan includes NVMe storage,
+              full root access, and enterprise-grade infrastructure.
             </p>
           </div>
 
-          {/* Featured FREE Trial card */}
-          <div className="max-w-lg mx-auto bg-white border-2 border-[#00459c] shadow-lg relative">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00459c] text-white text-[10px] font-bold px-3 py-1 uppercase tracking-wider whitespace-nowrap">
-              Start Free
-            </span>
-            <div className="p-8 text-center">
-              <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Trial</div>
-              <div className="mt-3 flex items-baseline justify-center">
-                <span className="text-5xl font-extrabold text-slate-900 font-mono">$0</span>
-                <span className="text-sm text-slate-500 ml-1.5">/first 30 days</span>
+          {/* VPS Plan Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              { key: 'kvm1', name: 'KVM 1', originalPrice: 1649, price: 599, discount: 64, vcpu: 1, ram: '4 GB', disk: '50 GB NVMe', bandwidth: '4 TB', renews: 999, popular: false },
+              { key: 'kvm2', name: 'KVM 2', originalPrice: 2099, price: 779, discount: 63, vcpu: 2, ram: '8 GB', disk: '100 GB NVMe', bandwidth: '8 TB', renews: 1199, popular: true },
+              { key: 'kvm4', name: 'KVM 4', originalPrice: 3499, price: 1099, discount: 69, vcpu: 4, ram: '16 GB', disk: '200 GB NVMe', bandwidth: '16 TB', renews: 2399, popular: false },
+              { key: 'kvm8', name: 'KVM 8', originalPrice: 6199, price: 2199, discount: 65, vcpu: 8, ram: '32 GB', disk: '400 GB NVMe', bandwidth: '32 TB', renews: 4399, popular: false },
+            ].map((plan) => (
+              <div key={plan.key} className={`relative bg-white border p-6 flex flex-col justify-between transition-all ${plan.popular ? 'border-[#7c3aed] ring-2 ring-[#7c3aed]/15 shadow-md' : 'border-slate-200 hover:border-[#00459c]/40 hover:shadow-sm'}`}>
+                {plan.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#7c3aed] text-white text-[9px] font-bold px-3 py-1 uppercase tracking-wider whitespace-nowrap">
+                    Most Popular
+                  </span>
+                )}
+                <span className="absolute top-4 right-4 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5">
+                  {plan.discount}% off
+                </span>
+                <div>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{plan.name}</div>
+                  <div className="mt-2 text-sm text-slate-400 line-through font-mono">&#8377;{plan.originalPrice}</div>
+                  <div className="mt-0.5 flex items-baseline">
+                    <span className="text-3xl font-extrabold text-slate-900 font-mono">&#8377;{plan.price}</span>
+                    <span className="text-sm text-slate-400 font-medium ml-1">/mo</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">Renews at &#8377;{plan.renews}/mo for 2 years. Cancel anytime.</p>
+                </div>
+                <div className="mt-5 border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
+                  <div className="flex items-center gap-2"><Cpu className="w-3.5 h-3.5 text-slate-400" /> {plan.vcpu} vCPU core{plan.vcpu > 1 ? 's' : ''}</div>
+                  <div className="flex items-center gap-2"><HardDrive className="w-3.5 h-3.5 text-slate-400" /> {plan.ram} RAM</div>
+                  <div className="flex items-center gap-2"><Server className="w-3.5 h-3.5 text-slate-400" /> {plan.disk}</div>
+                  <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5 text-slate-400" /> {plan.bandwidth} bandwidth</div>
+                </div>
+                <button
+                  onClick={() => onSelectPlan(plan.name, plan.price)}
+                  className={`mt-6 w-full font-bold text-sm py-3 transition-colors cursor-pointer ${plan.popular ? 'bg-[#7c3aed] hover:bg-[#6d28d9] text-white' : 'bg-white border border-[#00459c] text-[#00459c] hover:bg-[#00459c] hover:text-white'}`}
+                >
+                  Choose plan
+                </button>
               </div>
-              <p className="mt-2 text-sm text-slate-500">Up to 4 services · apps, databases &amp; workers</p>
-
-              <div className="my-6 border-t border-slate-100"></div>
-
-              <ul className="text-left space-y-3 text-xs text-slate-600">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Full cloud stack</strong> — cloud engine, SSL, storage, deployments, databases</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">30-day free trial</strong> — full platform for 30 days, no card required</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Then upgrade</strong> — flat $10/mo, unlimited services</span></li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /><span><strong className="text-slate-800">Everything included</strong> — SSL, Git deployments, databases, monitoring, zero config</span></li>
-              </ul>
-
-              <button
-                onClick={() => onSelectPlan('Trial', 0)}
-                className="mt-8 w-full bg-[#00459c] hover:bg-[#003577] text-white font-bold text-sm py-3.5 transition-colors cursor-pointer"
-              >
-                Start Building
-              </button>
-            </div>
-          </div>
-
-          {/* How billing works after the trial */}
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 max-w-lg mx-auto gap-4">
-            <div className="bg-slate-50 border border-slate-200 p-5 text-center">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Free Trial</div>
-              <div className="mt-1 text-xl font-extrabold text-slate-900 font-mono">$0<span className="text-xs text-slate-500 font-medium"> · 30 days</span></div>
-              <div className="text-[11px] text-slate-500 mt-1">Up to 4 services, full cloud stack</div>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 p-5 text-center">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pro</div>
-              <div className="mt-1 text-xl font-extrabold text-slate-900 font-mono">$10<span className="text-xs text-slate-500 font-medium">/mo</span></div>
-              <div className="text-[11px] text-slate-500 mt-1">Unlimited services, flat monthly</div>
-              <button
-                onClick={() => onSelectPlan('Pro', 10)}
-                className="mt-4 w-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs py-2.5 transition-colors cursor-pointer"
-              >
-                Upgrade
-              </button>
-            </div>
+            ))}
           </div>
 
           <p className="mt-8 text-center text-xs text-slate-400 max-w-lg mx-auto">
-            After your free month, upgrade to Pro for a flat $10/mo with unlimited services.
-            Cancel anytime — your projects stay yours.
+            All plans include NVMe storage, full root access, and 24/7 support.
+            Cancel anytime — your data stays yours.
           </p>
         </div>
       </section>
@@ -371,7 +362,7 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
           </div>
           <p className="mt-6 text-[11px] text-slate-200 flex items-center justify-center gap-2">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            $10/mo Pro after your free month · No credit card required · Cancel anytime
+            VPS hosting from &#8377;599/mo · No credit card required · Cancel anytime
           </p>
         </div>
       </section>

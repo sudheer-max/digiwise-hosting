@@ -18,7 +18,7 @@ function AppInner() {
   const [orderDetails, setOrderDetails] = useState<any | null>(null);
   const { isAdmin } = useAuth();
 
-  const CLOUD_PLANS = new Set(['Hobby', 'Pro', 'Team', 'Trial']);
+  const CLOUD_PLANS = new Set(['Hobby', 'Pro', 'Team', 'Trial', 'KVM 1', 'KVM 2', 'KVM 4', 'KVM 8']);
 
   const handleSelectPlan = (planName: string, price: number) => {
     if (CLOUD_PLANS.has(planName)) {
