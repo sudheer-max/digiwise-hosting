@@ -12,7 +12,7 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf /usr/share/nginx/html/*
 
 # Copy static export from builder
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/dist ./
 
 # Copy public assets
 COPY --from=builder /app/public ./public
