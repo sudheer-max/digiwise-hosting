@@ -18,6 +18,7 @@ export default function PlansView() {
   const [error, setError] = useState('');
   const [paying, setPaying] = useState('');
   const [payError, setPayError] = useState('');
+  const [billing, setBilling] = useState<'monthly' | 'yearly' | 'twoYear'>('twoYear');
 
   const load = async () => {
     setLoading(true);
@@ -40,7 +41,7 @@ export default function PlansView() {
 
     try {
       const cfg = await api.getPaymentConfig();
-      const order = await api.planCheckout(planKey);
+      const order = await api.planCheckout(planKey, billing);
 
       const loadScript = () => new Promise<void>((resolve, reject) => {
         if ((window as any).Razorpay) return resolve();
@@ -58,7 +59,7 @@ export default function PlansView() {
         amount: order.amount,
         currency: order.currency,
         name: 'DigiWise Cloud',
-        description: `${order.planName} plan`,
+        description: `${order.planName} - ${billing === 'monthly' ? '1 Month' : billing === 'yearly' ? '12 Months' : '24 Months'}`,
         order_id: order.razorpayOrderId,
         handler: (r: any) => {
           const qs = new URLSearchParams({
@@ -79,6 +80,13 @@ export default function PlansView() {
 
   const isActive = data?.planStatus === 'active';
   const isTrial = data?.planStatus === 'trial';
+
+  const pricingMap: Record<string, { monthly: number; yearly: number; twoYear: number }> = {
+    kvm1: { monthly: 999, yearly: 799, twoYear: 599 },
+    kvm2: { monthly: 1199, yearly: 999, twoYear: 779 },
+    kvm4: { monthly: 2399, yearly: 1499, twoYear: 1099 },
+    kvm8: { monthly: 4399, yearly: 2999, twoYear: 2199 },
+  };
 
   return (
     <div className="space-y-6">
@@ -112,7 +120,6 @@ export default function PlansView() {
                   </div>
                 )}
               </div>
-
               <div className="shrink-0">
                 <div className="text-3xl font-display font-bold text-slate-900">
                   {data.plan.price > 0 ? `₹${data.plan.price}` : 'Free'}
@@ -125,11 +132,42 @@ export default function PlansView() {
             </div>
           </Card>
 
+          {/* Billing Cycle Selector */}
+          <div className="flex justify-center">
+            <div className="inline-flex bg-slate-100 p-1 gap-1">
+              {([
+                { key: 'monthly' as const, label: '1 month' },
+                { key: 'yearly' as const, label: '12 months' },
+                { key: 'twoYear' as const, label: '24 months', badge: 'Best value' },
+              ]).map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setBilling(opt.key)}
+                  className={`relative px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    billing === opt.key
+                      ? 'bg-[#00459c] text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {opt.label}
+                  {opt.badge && (
+                    <span className="ml-1.5 bg-amber-400 text-white text-[8px] font-bold px-1.5 py-0.5 align-middle">{opt.badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* VPS Plan cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {(data.plans || []).filter(p => p.key !== 'trial').map((p) => {
               const current = p.key === data.plan.key;
               const featured = p.highlighted;
+              const prices = pricingMap[p.key];
+              const price = prices ? prices[billing] : p.price;
+              const monthlyPrice = prices ? prices.monthly : p.price;
+              const savings = prices ? Math.round(((monthlyPrice - price) / monthlyPrice) * 100) : 0;
+
               return (
                 <div
                   key={p.key}
@@ -142,13 +180,25 @@ export default function PlansView() {
                       Most Popular
                     </span>
                   )}
+                  {savings > 0 && (
+                    <span className="absolute top-4 right-4 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5">
+                      {savings}% off
+                    </span>
+                  )}
                   <div>
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{p.name}</div>
-                    <div className="mt-2 flex items-baseline">
-                      <span className="text-3xl font-display font-bold text-slate-900">₹{p.price}</span>
+                    {billing !== 'monthly' && prices && (
+                      <div className="mt-2 text-sm text-slate-400 line-through font-mono">₹{monthlyPrice}/mo</div>
+                    )}
+                    <div className="mt-0.5 flex items-baseline">
+                      <span className="text-3xl font-display font-bold text-slate-900">₹{price}</span>
                       <span className="text-sm text-slate-400 font-medium ml-1">/mo</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">{p.description}</p>
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      {billing === 'monthly' && 'Billed monthly'}
+                      {billing === 'yearly' && `Billed ₹${(price * 12).toLocaleString('en-IN')}/year`}
+                      {billing === 'twoYear' && `Billed ₹${(price * 24).toLocaleString('en-IN')}/2 years`}
+                    </div>
 
                     {p.specs && (
                       <div className="mt-4 border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
@@ -156,12 +206,6 @@ export default function PlansView() {
                         <div className="flex items-center gap-2"><HardDrive className="w-3.5 h-3.5 text-slate-400" /> {p.specs.ram} RAM</div>
                         <div className="flex items-center gap-2"><Server className="w-3.5 h-3.5 text-slate-400" /> {p.specs.disk}</div>
                         <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5 text-slate-400" /> {p.specs.bandwidth} bandwidth</div>
-                      </div>
-                    )}
-
-                    {p.renewsAt && (
-                      <div className="mt-3 text-[11px] text-slate-400">
-                        Renews at ₹{p.renewsAt}/mo
                       </div>
                     )}
                   </div>

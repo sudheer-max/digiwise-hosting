@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Rocket, Database, LayoutTemplate, ShieldCheck, HardDrive, Timer, ArrowRight,
   CheckCircle2, Zap, Sparkles, Server, Cpu, Network, Boxes, Container
@@ -57,6 +57,8 @@ const features = [
 ];
 
 export default function LandingView({ onSelectPlan }: LandingViewProps) {
+  const [billing, setBilling] = useState<'monthly' | 'yearly' | 'twoYear'>('twoYear');
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
@@ -284,47 +286,92 @@ export default function LandingView({ onSelectPlan }: LandingViewProps) {
             </p>
           </div>
 
-          {/* VPS Plan Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              { key: 'kvm1', name: 'KVM 1', originalPrice: 1649, price: 599, discount: 64, vcpu: 1, ram: '4 GB', disk: '50 GB NVMe', bandwidth: '4 TB', renews: 999, popular: false },
-              { key: 'kvm2', name: 'KVM 2', originalPrice: 2099, price: 779, discount: 63, vcpu: 2, ram: '8 GB', disk: '100 GB NVMe', bandwidth: '8 TB', renews: 1199, popular: true },
-              { key: 'kvm4', name: 'KVM 4', originalPrice: 3499, price: 1099, discount: 69, vcpu: 4, ram: '16 GB', disk: '200 GB NVMe', bandwidth: '16 TB', renews: 2399, popular: false },
-              { key: 'kvm8', name: 'KVM 8', originalPrice: 6199, price: 2199, discount: 65, vcpu: 8, ram: '32 GB', disk: '400 GB NVMe', bandwidth: '32 TB', renews: 4399, popular: false },
-            ].map((plan) => (
-              <div key={plan.key} className={`relative bg-white border p-6 flex flex-col justify-between transition-all ${plan.popular ? 'border-[#7c3aed] ring-2 ring-[#7c3aed]/15 shadow-md' : 'border-slate-200 hover:border-[#00459c]/40 hover:shadow-sm'}`}>
-                {plan.popular && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#7c3aed] text-white text-[9px] font-bold px-3 py-1 uppercase tracking-wider whitespace-nowrap">
-                    Most Popular
-                  </span>
-                )}
-                <span className="absolute top-4 right-4 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5">
-                  {plan.discount}% off
-                </span>
-                <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{plan.name}</div>
-                  <div className="mt-2 text-sm text-slate-400 line-through font-mono">&#8377;{plan.originalPrice}</div>
-                  <div className="mt-0.5 flex items-baseline">
-                    <span className="text-3xl font-extrabold text-slate-900 font-mono">&#8377;{plan.price}</span>
-                    <span className="text-sm text-slate-400 font-medium ml-1">/mo</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">Renews at &#8377;{plan.renews}/mo for 2 years. Cancel anytime.</p>
-                </div>
-                <div className="mt-5 border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
-                  <div className="flex items-center gap-2"><Cpu className="w-3.5 h-3.5 text-slate-400" /> {plan.vcpu} vCPU core{plan.vcpu > 1 ? 's' : ''}</div>
-                  <div className="flex items-center gap-2"><HardDrive className="w-3.5 h-3.5 text-slate-400" /> {plan.ram} RAM</div>
-                  <div className="flex items-center gap-2"><Server className="w-3.5 h-3.5 text-slate-400" /> {plan.disk}</div>
-                  <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5 text-slate-400" /> {plan.bandwidth} bandwidth</div>
-                </div>
+          {/* Billing Cycle Selector */}
+          <div className="flex justify-center mb-10">
+            <div className="inline-flex bg-slate-100 p-1 gap-1">
+              {([
+                { key: 'monthly' as const, label: '1 month' },
+                { key: 'yearly' as const, label: '12 months' },
+                { key: 'twoYear' as const, label: '24 months', badge: 'Best value' },
+              ]).map((opt) => (
                 <button
-                  onClick={() => onSelectPlan(plan.name, plan.price)}
-                  className={`mt-6 w-full font-bold text-sm py-3 transition-colors cursor-pointer ${plan.popular ? 'bg-[#7c3aed] hover:bg-[#6d28d9] text-white' : 'bg-white border border-[#00459c] text-[#00459c] hover:bg-[#00459c] hover:text-white'}`}
+                  key={opt.key}
+                  onClick={() => setBilling(opt.key)}
+                  className={`relative px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    billing === opt.key
+                      ? 'bg-[#00459c] text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
                 >
-                  Choose plan
+                  {opt.label}
+                  {opt.badge && (
+                    <span className="ml-1.5 bg-amber-400 text-white text-[8px] font-bold px-1.5 py-0.5 align-middle">{opt.badge}</span>
+                  )}
                 </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          {/* VPS Plan Cards */}
+          {(() => {
+            const plans = [
+              { key: 'kvm1', name: 'KVM 1', monthly: 999, yearly: 799, twoYear: 599, vcpu: 1, ram: '4 GB', disk: '50 GB NVMe', bandwidth: '4 TB', popular: false },
+              { key: 'kvm2', name: 'KVM 2', monthly: 1199, yearly: 999, twoYear: 779, vcpu: 2, ram: '8 GB', disk: '100 GB NVMe', bandwidth: '8 TB', popular: true },
+              { key: 'kvm4', name: 'KVM 4', monthly: 2399, yearly: 1499, twoYear: 1099, vcpu: 4, ram: '16 GB', disk: '200 GB NVMe', bandwidth: '16 TB', popular: false },
+              { key: 'kvm8', name: 'KVM 8', monthly: 4399, yearly: 2999, twoYear: 2199, vcpu: 8, ram: '32 GB', disk: '400 GB NVMe', bandwidth: '32 TB', popular: false },
+            ];
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                {plans.map((plan) => {
+                  const price = plan[billing];
+                  const originalPrice = plan.monthly;
+                  const savings = Math.round(((originalPrice - price) / originalPrice) * 100);
+                  const totalAmount = price * (billing === 'monthly' ? 1 : billing === 'yearly' ? 12 : 24);
+                  return (
+                    <div key={plan.key} className={`relative bg-white border p-6 flex flex-col justify-between transition-all ${plan.popular ? 'border-[#7c3aed] ring-2 ring-[#7c3aed]/15 shadow-md' : 'border-slate-200 hover:border-[#00459c]/40 hover:shadow-sm'}`}>
+                      {plan.popular && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#7c3aed] text-white text-[9px] font-bold px-3 py-1 uppercase tracking-wider whitespace-nowrap">
+                          Most Popular
+                        </span>
+                      )}
+                      {savings > 0 && (
+                        <span className="absolute top-4 right-4 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5">
+                          {savings}% off
+                        </span>
+                      )}
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{plan.name}</div>
+                        {billing !== 'monthly' && (
+                          <div className="mt-2 text-sm text-slate-400 line-through font-mono">&#8377;{originalPrice}/mo</div>
+                        )}
+                        <div className="mt-0.5 flex items-baseline">
+                          <span className="text-3xl font-extrabold text-slate-900 font-mono">&#8377;{price}</span>
+                          <span className="text-sm text-slate-400 font-medium ml-1">/mo</span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                          {billing === 'monthly' && 'Billed monthly'}
+                          {billing === 'yearly' && `Billed &#8377;${(price * 12).toLocaleString('en-IN')}/year`}
+                          {billing === 'twoYear' && `Billed &#8377;${(price * 24).toLocaleString('en-IN')}/2 years`}
+                        </div>
+                      </div>
+                      <div className="mt-5 border-t border-slate-100 pt-4 space-y-2.5 text-xs text-slate-600">
+                        <div className="flex items-center gap-2"><Cpu className="w-3.5 h-3.5 text-slate-400" /> {plan.vcpu} vCPU core{plan.vcpu > 1 ? 's' : ''}</div>
+                        <div className="flex items-center gap-2"><HardDrive className="w-3.5 h-3.5 text-slate-400" /> {plan.ram} RAM</div>
+                        <div className="flex items-center gap-2"><Server className="w-3.5 h-3.5 text-slate-400" /> {plan.disk}</div>
+                        <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5 text-slate-400" /> {plan.bandwidth} bandwidth</div>
+                      </div>
+                      <button
+                        onClick={() => onSelectPlan(plan.name, price)}
+                        className={`mt-6 w-full font-bold text-sm py-3 transition-colors cursor-pointer ${plan.popular ? 'bg-[#7c3aed] hover:bg-[#6d28d9] text-white' : 'bg-white border border-[#00459c] text-[#00459c] hover:bg-[#00459c] hover:text-white'}`}
+                      >
+                        Choose plan
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           <p className="mt-8 text-center text-xs text-slate-400 max-w-lg mx-auto">
             All plans include NVMe storage, full root access, and 24/7 support.

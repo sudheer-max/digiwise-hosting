@@ -14,11 +14,11 @@ import DigiWiseFooter from './components/DigiWiseFooter';
 function AppInner() {
   const [activeTab, setActiveTab] = useState<string>('landing');
   const [cartItems, setCartItems] = useState<string[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: number } | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: number; billing?: string } | null>(null);
   const [orderDetails, setOrderDetails] = useState<any | null>(null);
   const { isAdmin } = useAuth();
 
-  const CLOUD_PLANS = new Set(['Hobby', 'Pro', 'Team', 'Trial', 'KVM 1', 'KVM 2', 'KVM 4', 'KVM 8']);
+  const CLOUD_PLANS = new Set(['Trial']);
 
   const handleSelectPlan = (planName: string, price: number) => {
     if (CLOUD_PLANS.has(planName)) {
@@ -26,7 +26,7 @@ function AppInner() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    setSelectedPlan({ name: planName, price: price });
+    setSelectedPlan({ name: planName, price });
     setActiveTab('checkout');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

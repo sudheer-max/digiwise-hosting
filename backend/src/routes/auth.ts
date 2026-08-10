@@ -3,7 +3,142 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../db/client.js';
 import { config } from '../config.js';
 
+const otpStore = new Map<string, { code: string; expiresAt: number; purpose: string }>();
+
+function generateOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function sendOtpEmail(email: string, code: string, purpose: string): Promise<boolean> {
+  try {
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      secure: config.smtp.secure,
+      ignoreTLS: config.smtp.port === 25 && !config.smtp.secure,
+      ...(config.smtp.user && config.smtp.pass ? { auth: { user: config.smtp.user, pass: config.smtp.pass } } : {}),
+    });
+
+    const subject = purpose === 'signup'
+      ? `[DigiWise Hosting] Verify your email address`
+      : `[DigiWise Hosting] Password reset code`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f4f6f9;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background: #f4f6f9; padding: 40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+        <tr>
+          <td style="background: linear-gradient(135deg, #00459c 0%, #002866 100%); padding: 32px; text-align: center;">
+            <h1 style="color: #ffffff; font-size: 20px; margin: 0;">DigiWise Hosting</h1>
+          </td>
+        </tr>
+        <tr><td style="padding: 32px; text-align: center;">
+          <p style="font-size: 14px; color: #475569; margin: 0 0 16px;">
+            ${purpose === 'signup' ? 'Thank you for signing up! Please verify your email address.' : 'You requested a password reset.'}
+          </p>
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin: 16px 0;">
+            <p style="font-size: 12px; color: #94a3b8; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 1px;">Your verification code</p>
+            <p style="font-size: 32px; font-weight: 800; color: #002866; margin: 0; letter-spacing: 8px; font-family: monospace;">${code}</p>
+          </div>
+          <p style="font-size: 12px; color: #94a3b8; margin: 16px 0 0;">This code expires in 10 minutes.</p>
+        </td></tr>
+        <tr><td style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+            DigiWise Softech — <a href="https://digiwisesoftech.com" style="color: #00459c;">digiwisesoftech.com</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    await transporter.sendMail({
+      from: `"DigiWise Hosting" <${config.smtp.from}>`,
+      to: email,
+      subject,
+      html,
+    });
+
+    console.log(`[OTP] Sent ${purpose} OTP to ${email}`);
+    return true;
+  } catch (err: any) {
+    console.error(`[OTP] Failed to send to ${email}:`, err.message);
+    return false;
+  }
+}
+
 export async function authRoutes(app: FastifyInstance) {
+  app.post('/api/auth/send-otp', {
+    schema: {
+      tags: ['Auth'],
+      description: 'Send OTP code to email for verification',
+      body: {
+        type: 'object',
+        required: ['email', 'purpose'],
+        properties: {
+          email: { type: 'string' },
+          purpose: { type: 'string', enum: ['signup', 'reset'] },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { email, purpose } = request.body as { email: string; purpose: string };
+
+    const code = generateOtp();
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    otpStore.set(`${email}:${purpose}`, { code, expiresAt, purpose });
+
+    const sent = await sendOtpEmail(email, code, purpose);
+    if (!sent) {
+      return reply.status(500).send({ error: 'Failed to send OTP email' });
+    }
+
+    return { success: true, message: 'OTP sent successfully' };
+  });
+
+  app.post('/api/auth/verify-otp', {
+    schema: {
+      tags: ['Auth'],
+      description: 'Verify OTP code',
+      body: {
+        type: 'object',
+        required: ['email', 'code', 'purpose'],
+        properties: {
+          email: { type: 'string' },
+          code: { type: 'string' },
+          purpose: { type: 'string', enum: ['signup', 'reset'] },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { email, code, purpose } = request.body as { email: string; code: string; purpose: string };
+
+    const key = `${email}:${purpose}`;
+    const stored = otpStore.get(key);
+
+    if (!stored) {
+      return reply.status(400).send({ error: 'No OTP found. Please request a new code.' });
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      otpStore.delete(key);
+      return reply.status(400).send({ error: 'OTP has expired. Please request a new code.' });
+    }
+
+    if (stored.code !== code) {
+      return reply.status(400).send({ error: 'Invalid OTP code' });
+    }
+
+    otpStore.delete(key);
+    return { success: true, message: 'OTP verified successfully' };
+  });
+
   app.post('/api/auth/register', {
     schema: {
       tags: ['Auth'],

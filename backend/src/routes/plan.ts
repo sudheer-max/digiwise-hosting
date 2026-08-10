@@ -28,19 +28,27 @@ export async function planRoutes(app: FastifyInstance) {
         required: ['plan'],
         properties: {
           plan: { type: 'string', enum: Object.keys(PLAN_CATALOG) },
+          billing: { type: 'string', enum: ['monthly', 'yearly', 'twoYear'], default: 'twoYear' },
         },
       },
     },
   }, async (request, reply) => {
     const user = request.user as { id: string };
-    const { plan } = request.body as { plan: string };
+    const { plan, billing } = request.body as { plan: string; billing?: string };
     const def = PLAN_CATALOG[plan];
     if (!def || def.price <= 0) {
       return reply.status(400).send({ error: 'This plan does not require payment' });
     }
 
+    const billingCycle = billing || 'twoYear';
+    const monthlyPrice = def.pricing
+      ? def.pricing[billingCycle as keyof typeof def.pricing] || def.pricing.twoYear
+      : def.price;
+    const months = billingCycle === 'monthly' ? 1 : billingCycle === 'yearly' ? 12 : 24;
+    const totalAmount = monthlyPrice * months;
+
     const auth = Buffer.from(`${config.razorpay.keyId}:${config.razorpay.keySecret}`).toString('base64');
-    const amount = Math.round(def.price * 100);
+    const amount = Math.round(totalAmount * 100);
     const suffix = Math.random().toString(36).slice(2, 8);
     const receipt = `plan_${Date.now()}_${suffix}`;
 
@@ -54,6 +62,7 @@ export async function planRoutes(app: FastifyInstance) {
         notes: {
           userId: user.id,
           plan,
+          billing: billingCycle,
           action: 'plan_upgrade',
         },
       }),
@@ -67,6 +76,10 @@ export async function planRoutes(app: FastifyInstance) {
       success: true,
       plan,
       planName: def.name,
+      billing: billingCycle,
+      monthlyPrice,
+      months,
+      totalAmount,
       amount,
       currency: 'INR',
       razorpayOrderId: razorpayOrder.id,
@@ -84,6 +97,32 @@ export async function planRoutes(app: FastifyInstance) {
     const user = request.user as { id: string };
     await applyPlanUpgrade(user.id, 'payg');
     return { success: true, plan: 'payg' };
+  });
+
+  // Admin: activate a plan directly (no payment)
+  app.post('/api/plan/admin-activate', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['Plan'],
+      description: 'Admin: activate a plan without payment',
+      body: {
+        type: 'object',
+        required: ['plan'],
+        properties: {
+          plan: { type: 'string' },
+          billing: { type: 'string', enum: ['monthly', 'yearly', 'twoYear'], default: 'monthly' },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    if (user.role !== 'admin') {
+      return reply.status(403).send({ error: 'Admin access required' });
+    }
+
+    const { plan } = request.body as { plan: string; billing?: string };
+    await applyPlanUpgrade(user.id, plan);
+    return { success: true, plan };
   });
 
   app.get('/api/plan/razorpay-callback', {

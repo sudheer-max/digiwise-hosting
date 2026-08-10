@@ -16,6 +16,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   githubLogin: (code: string) => Promise<void>;
+  sendOtp: (email: string, purpose: 'signup' | 'reset') => Promise<void>;
+  verifyOtp: (email: string, code: string, purpose: 'signup' | 'reset') => Promise<void>;
   logout: () => void;
   isAdmin: boolean;
 }
@@ -65,6 +67,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(res.user as User);
   };
 
+  const sendOtp = async (email: string, purpose: 'signup' | 'reset') => {
+    await api.sendOtp(email, purpose);
+  };
+
+  const verifyOtp = async (email: string, code: string, purpose: 'signup' | 'reset') => {
+    await api.verifyOtp(email, code, purpose);
+  };
+
   const logout = () => {
     api.setToken(null);
     setUser(null);
@@ -73,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, githubLogin, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, register, githubLogin, sendOtp, verifyOtp, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

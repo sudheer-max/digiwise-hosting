@@ -75,6 +75,20 @@ class ApiClient {
     return this.request('/auth/me');
   }
 
+  sendOtp(email: string, purpose: 'signup' | 'reset') {
+    return this.request('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, purpose }),
+    });
+  }
+
+  verifyOtp(email: string, code: string, purpose: 'signup' | 'reset') {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, purpose }),
+    });
+  }
+
   // Payment / checkout
   checkoutDomains(items: { name: string; price: number; type: string }[], customer: any, countryCode = 'US', provider: 'razorpay' = 'razorpay') {
     return this.request('/domains/checkout', {
@@ -108,10 +122,10 @@ class ApiClient {
     return this.request('/plan');
   }
 
-  planCheckout(plan: string) {
+  planCheckout(plan: string, billing: string = 'twoYear') {
     return this.request('/plan/checkout', {
       method: 'POST',
-      body: JSON.stringify({ plan }),
+      body: JSON.stringify({ plan, billing }),
     });
   }
 
@@ -119,6 +133,13 @@ class ApiClient {
     return this.request('/plan/activate-payg', {
       method: 'POST',
       body: JSON.stringify({}),
+    });
+  }
+
+  adminActivatePlan(plan: string, billing: string = 'monthly') {
+    return this.request('/plan/admin-activate', {
+      method: 'POST',
+      body: JSON.stringify({ plan, billing }),
     });
   }
 
@@ -214,7 +235,7 @@ class ApiClient {
   deleteProject(id: string) {
     return this.request(`/projects/${id}`, {
       method: 'DELETE',
-    });
+    }, 30000);
   }
 
   listProjectDeployments(id: string) {
@@ -267,7 +288,7 @@ class ApiClient {
   deleteApp(projectId: string, name: string) {
     return this.request(`/projects/${projectId}/apps/${name}`, {
       method: 'DELETE',
-    });
+    }, 30000);
   }
 
   scaleApp(projectId: string, name: string, replicas: number) {
@@ -310,7 +331,7 @@ class ApiClient {
   deleteDatabase(namespace: string, type: string, name: string) {
     return this.request(`/databases/${namespace}/${type}/${name}`, {
       method: 'DELETE',
-    });
+    }, 30000);
   }
 
   getDatabaseVariables(namespace: string, type: string, name: string) {

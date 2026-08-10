@@ -17,14 +17,35 @@ export interface PlanDefinition {
     bandwidth: string;
   };
   renewsAt?: number;
+  pricing?: {
+    monthly: number;
+    yearly: number;
+    twoYear: number;
+  };
 }
 
 export const PLAN_CATALOG: Record<string, PlanDefinition> = {
   trial: { key: 'trial', name: 'Free Trial', price: 0, serviceLimit: 4, description: 'Free for 30 days - deploy up to 4 services', billing: 'free' },
-  kvm1: { key: 'kvm1', name: 'KVM 1', price: 599, serviceLimit: 1, description: '1 vCPU, 4 GB RAM, 50 GB NVMe, 4 TB bandwidth', billing: 'flat', specs: { vcpu: 1, ram: '4 GB', disk: '50 GB NVMe', bandwidth: '4 TB' }, renewsAt: 999 },
-  kvm2: { key: 'kvm2', name: 'KVM 2', price: 779, serviceLimit: 1, description: '2 vCPU, 8 GB RAM, 100 GB NVMe, 8 TB bandwidth', billing: 'flat', highlighted: true, specs: { vcpu: 2, ram: '8 GB', disk: '100 GB NVMe', bandwidth: '8 TB' }, renewsAt: 1199 },
-  kvm4: { key: 'kvm4', name: 'KVM 4', price: 1099, serviceLimit: 1, description: '4 vCPU, 16 GB RAM, 200 GB NVMe, 16 TB bandwidth', billing: 'flat', specs: { vcpu: 4, ram: '16 GB', disk: '200 GB NVMe', bandwidth: '16 TB' }, renewsAt: 2399 },
-  kvm8: { key: 'kvm8', name: 'KVM 8', price: 2199, serviceLimit: 1, description: '8 vCPU, 32 GB RAM, 400 GB NVMe, 32 TB bandwidth', billing: 'flat', specs: { vcpu: 8, ram: '32 GB', disk: '400 GB NVMe', bandwidth: '32 TB' }, renewsAt: 4399 },
+  kvm1: {
+    key: 'kvm1', name: 'KVM 1', price: 599, serviceLimit: 1, description: '1 vCPU core, 4 GB RAM, 50 GB NVMe disk, 4 TB bandwidth',
+    billing: 'flat', specs: { vcpu: 1, ram: '4 GB', disk: '50 GB NVMe', bandwidth: '4 TB' },
+    pricing: { monthly: 999, yearly: 799, twoYear: 599 },
+  },
+  kvm2: {
+    key: 'kvm2', name: 'KVM 2', price: 779, serviceLimit: 1, description: '2 vCPU cores, 8 GB RAM, 100 GB NVMe disk, 8 TB bandwidth',
+    billing: 'flat', highlighted: true, specs: { vcpu: 2, ram: '8 GB', disk: '100 GB NVMe', bandwidth: '8 TB' },
+    pricing: { monthly: 1199, yearly: 999, twoYear: 779 },
+  },
+  kvm4: {
+    key: 'kvm4', name: 'KVM 4', price: 1099, serviceLimit: 1, description: '4 vCPU cores, 16 GB RAM, 200 GB NVMe disk, 16 TB bandwidth',
+    billing: 'flat', specs: { vcpu: 4, ram: '16 GB', disk: '200 GB NVMe', bandwidth: '16 TB' },
+    pricing: { monthly: 2399, yearly: 1499, twoYear: 1099 },
+  },
+  kvm8: {
+    key: 'kvm8', name: 'KVM 8', price: 2199, serviceLimit: 1, description: '8 vCPU cores, 32 GB RAM, 400 GB NVMe disk, 32 TB bandwidth',
+    billing: 'flat', specs: { vcpu: 8, ram: '32 GB', disk: '400 GB NVMe', bandwidth: '32 TB' },
+    pricing: { monthly: 4399, yearly: 2999, twoYear: 2199 },
+  },
 };
 
 export const TRIAL_DAYS = 30;

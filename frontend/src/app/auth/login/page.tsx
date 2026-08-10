@@ -1,15 +1,16 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AuthView from '../../../components/AuthView';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '/console';
 
   const handleAuthSuccess = (email: string) => {
-    // Navigate to the console on successful login
-    router.push('/console');
+    router.push(returnTo);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

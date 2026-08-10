@@ -9,7 +9,7 @@ interface AuthViewProps {
 }
 
 export default function AuthView({ initialMode = 'login', onAuthSuccess, onCancel }: AuthViewProps) {
-  const { login, register, githubLogin } = useAuth();
+  const { login, register, githubLogin, sendOtp, verifyOtp } = useAuth();
   const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +17,55 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+
+  const handleSendOtp = async () => {
+    if (!email) {
+      setErrorMsg('Please enter your email address first');
+      return;
+    }
+    setIsAuthenticating(true);
+    setErrorMsg('');
+    try {
+      await sendOtp(email, 'signup');
+      setOtpSent(true);
+      setOtpCountdown(60);
+      const timer = setInterval(() => {
+        setOtpCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to send OTP');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      setErrorMsg('Please enter a 6-digit code');
+      return;
+    }
+    setIsAuthenticating(true);
+    setErrorMsg('');
+    try {
+      await verifyOtp(email, otpCode, 'signup');
+      setOtpVerified(true);
+      setErrorMsg('');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Invalid OTP code');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +75,11 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
       if (mode === 'login') {
         await login(email, password);
       } else {
+        if (!otpVerified) {
+          setErrorMsg('Please verify your email first');
+          setIsAuthenticating(false);
+          return;
+        }
         await register(email, password, name || email.split('@')[0]);
       }
       setSuccessMsg(`Successfully ${mode === 'login' ? 'logged in' : 'registered'}!`);
@@ -123,8 +177,72 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs outline-none focus:border-[#00459c] focus:bg-white font-semibold"
                   required
+                  disabled={otpVerified}
                 />
               </div>
+
+              {mode === 'signup' && (
+                <>
+                  {!otpSent ? (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={isAuthenticating || !email}
+                      className="w-full bg-slate-800 hover:bg-slate-700 disabled:bg-slate-400 text-white font-bold py-2.5 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isAuthenticating ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin"></span>
+                          SENDING...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4" />
+                          SEND VERIFICATION CODE
+                        </>
+                      )}
+                    </button>
+                  ) : !otpVerified ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                          <Key className="w-3 h-3" /> Verification Code
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Enter 6-digit code"
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs outline-none focus:border-[#00459c] focus:bg-white font-semibold"
+                          maxLength={6}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleVerifyOtp}
+                          disabled={isAuthenticating || otpCode.length !== 6}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-bold py-2.5 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          {isAuthenticating ? 'VERIFYING...' : 'VERIFY CODE'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSendOtp}
+                          disabled={isAuthenticating || otpCountdown > 0}
+                          className="bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-600 font-bold py-2.5 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          {otpCountdown > 0 ? `${otpCountdown}s` : 'RESEND'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700 font-semibold flex items-center gap-2">
+                      <Check className="w-4 h-4" /> Email verified successfully!
+                    </div>
+                  )}
+                </>
+              )}
 
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1 flex items-center gap-1">
@@ -143,8 +261,8 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
 
               <button
                 type="submit"
-                disabled={isAuthenticating}
-                className={`w-full bg-[#00459c] hover:bg-[#003882] text-white font-bold py-3 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                disabled={isAuthenticating || (mode === 'signup' && !otpVerified)}
+                className={`w-full bg-[#00459c] hover:bg-[#003882] disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 ${
                   isAuthenticating ? 'opacity-80 cursor-not-allowed' : ''
                 }`}
               >
