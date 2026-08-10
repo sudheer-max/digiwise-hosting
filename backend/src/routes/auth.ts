@@ -11,14 +11,14 @@ function generateOtp(): string {
 
 async function sendOtpEmail(email: string, code: string, purpose: string): Promise<boolean> {
   try {
-    const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port,
-      secure: config.smtp.secure,
-      ignoreTLS: config.smtp.port === 25 && !config.smtp.secure,
-      ...(config.smtp.user && config.smtp.pass ? { auth: { user: config.smtp.user, pass: config.smtp.pass } } : {}),
-    });
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      console.error('[OTP] RESEND_API_KEY not set');
+      return false;
+    }
+
+    const { Resend } = await import('resend');
+    const resend = new Resend(resendApiKey);
 
     const subject = purpose === 'signup'
       ? `[DigiWise Hosting] Verify your email address`
@@ -58,14 +58,14 @@ async function sendOtpEmail(email: string, code: string, purpose: string): Promi
 </body>
 </html>`;
 
-    await transporter.sendMail({
-      from: `"DigiWise Hosting" <${config.smtp.from}>`,
+    await resend.emails.send({
+      from: process.env.SMTP_FROM || 'noreply@digiwisesoftech.com',
       to: email,
       subject,
       html,
     });
 
-    console.log(`[OTP] Sent ${purpose} OTP to ${email}`);
+    console.log(`[OTP] Sent ${purpose} OTP to ${email} via Resend`);
     return true;
   } catch (err: any) {
     console.error(`[OTP] Failed to send to ${email}:`, err.message);
