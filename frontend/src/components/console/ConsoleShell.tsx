@@ -8,7 +8,7 @@ import {
   HardDriveDownload, ShieldCheck as ShieldCert, Network as NetworkCluster,
   Bell, KeySquare, Palette, Fingerprint, LayoutTemplate, CreditCard,
   Wallet, Share2, BookOpen, Radio, MessageSquare, Home, UserCog,
-  Cpu, Workflow, Camera, LineChart, Warehouse
+  Cpu, Workflow, Camera, LineChart, Warehouse, ShoppingCart
 } from 'lucide-react';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -160,6 +160,9 @@ interface ConsoleData {
   loading: boolean;
   error: string;
   refresh: () => Promise<void>;
+  plan: any | null;
+  planLoading: boolean;
+  hasPaidPlan: boolean;
 }
 
 export const ConsoleContext = React.createContext<{
@@ -240,7 +243,11 @@ export default function ConsoleShell() {
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [plan, setPlan] = useState<any | null>(null);
+  const [planLoading, setPlanLoading] = useState(true);
   const { user, logout } = useAuth();
+
+  const hasPaidPlan = plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active';
 
   const refresh = useCallback(async () => {
     setError('');
@@ -254,7 +261,19 @@ export default function ConsoleShell() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  const fetchPlan = useCallback(async () => {
+    setPlanLoading(true);
+    try {
+      const planData = await api.getPlan();
+      setPlan(planData);
+    } catch {
+      setPlan(null);
+    } finally {
+      setPlanLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); fetchPlan(); }, [refresh, fetchPlan]);
 
   useEffect(() => {
     if (route.name === 'billing') {
@@ -267,7 +286,7 @@ export default function ConsoleShell() {
     setSidebarOpen(false);
   }, []);
 
-  const ctx = useMemo(() => ({ data: { projects, loading, error, refresh }, navigate, route }), [projects, loading, error, refresh, navigate, route]);
+  const ctx = useMemo(() => ({ data: { projects, loading, error, refresh, plan, planLoading, hasPaidPlan }, navigate, route }), [projects, loading, error, refresh, plan, planLoading, hasPaidPlan, navigate, route]);
 
   const { apps, dbs, composes } = useMemo(() => aggregateResources(projects), [projects]);
 
@@ -502,6 +521,20 @@ export default function ConsoleShell() {
 
           <main className="flex-1 overflow-y-auto p-4 lg:p-8">
             <div className="max-w-6xl mx-auto">
+              {!hasPaidPlan && !planLoading && user?.role !== 'admin' && (
+                <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-5 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-amber-100 flex items-center justify-center shrink-0">
+                    <ShoppingCart className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-amber-900">No active plan</div>
+                    <div className="text-xs text-amber-700 mt-0.5">Purchase a VPS hosting plan to create projects, databases, and deploy applications.</div>
+                  </div>
+                  <a href="/checkout" className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-2.5 transition-colors">
+                    Purchase Plan
+                  </a>
+                </div>
+              )}
               {renderView()}
             </div>
           </main>

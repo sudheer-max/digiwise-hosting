@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 import { prisma } from '../db/client.js';
 import { applyPlanUpgrade, getUsageSnapshot, PLAN_CATALOG } from '../services/plan.js';
+import { sendInvoiceEmail } from '../services/email.js';
 
 export async function planRoutes(app: FastifyInstance) {
   app.get('/api/plan', {
@@ -145,6 +146,7 @@ export async function planRoutes(app: FastifyInstance) {
 
     let userId = '';
     let plan = '';
+    let billingCycle = 'twoYear';
     try {
       const auth = Buffer.from(`${config.razorpay.keyId}:${config.razorpay.keySecret}`).toString('base64');
       const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${razorpay_order_id}`, {
@@ -154,6 +156,7 @@ export async function planRoutes(app: FastifyInstance) {
       if (orderData.notes) {
         userId = orderData.notes.userId || '';
         plan = orderData.notes.plan || '';
+        billingCycle = orderData.notes.billing || 'twoYear';
       }
     } catch {
       return reply.redirect(`${config.frontendUrl}/console?plan=error&reason=order`, 302);
@@ -169,6 +172,26 @@ export async function planRoutes(app: FastifyInstance) {
     }
 
     await applyPlanUpgrade(user.id, plan);
+
+    const planDef = PLAN_CATALOG[plan];
+    const monthlyPrice = planDef?.pricing
+      ? planDef.pricing[billingCycle as keyof typeof planDef.pricing] || planDef.pricing.twoYear
+      : planDef?.price || 0;
+    const months = billingCycle === 'monthly' ? 1 : billingCycle === 'yearly' ? 12 : 24;
+    const totalAmount = monthlyPrice * months;
+
+    sendInvoiceEmail({
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      planName: planDef?.name || plan,
+      billing: billingCycle,
+      monthlyPrice,
+      months,
+      totalAmount,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      date: new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
+    }).catch(err => console.error('[Invoice] Failed to send:', err));
 
     return reply.redirect(`${config.frontendUrl}/console?plan=upgraded&planName=${encodeURIComponent(PLAN_CATALOG[plan]?.name || plan)}`, 302);
   });

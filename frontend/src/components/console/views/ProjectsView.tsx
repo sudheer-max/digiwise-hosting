@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { FolderKanban, Plus, Rocket, Database, Trash2, Loader2, Globe, Layers, ExternalLink } from 'lucide-react';
+import { FolderKanban, Plus, Rocket, Database, Trash2, Loader2, Globe, Layers, ExternalLink, ShoppingCart, ArrowRight } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import { SectionHeader, PrimaryButton, GhostButton, Loader, EmptyState, ErrorBanner, Modal, ConfirmDeleteDialog } from '../ui';
 
 export default function ProjectsView() {
   const { data, navigate } = useConsole();
-  const { projects, loading, error, refresh } = data;
+  const { projects, loading, error, refresh, hasPaidPlan } = data;
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
@@ -57,9 +57,15 @@ export default function ProjectsView() {
         title="Projects"
         subtitle={`${projects.length} project(s). Projects group your applications and databases.`}
         action={
-          <PrimaryButton onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4" /> New Project
-          </PrimaryButton>
+          hasPaidPlan ? (
+            <PrimaryButton onClick={() => setShowCreate(true)}>
+              <Plus className="w-4 h-4" /> New Project
+            </PrimaryButton>
+          ) : (
+            <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-2 transition-colors">
+              <ShoppingCart className="w-4 h-4" /> Purchase Plan to Create
+            </a>
+          )
         }
       />
 

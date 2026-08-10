@@ -29,7 +29,7 @@ const VPS_PRICING: Record<string, { monthly: number; yearly: number; twoYear: nu
 export default function CheckoutView({ selectedPlan, cartItems = [], onPurchaseComplete }: CheckoutViewProps) {
   const router = useRouter();
   const { user, loading, isAdmin } = useAuth();
-  const { removeFromCart, cartOptions } = useApp();
+  const { removeFromCart, cartOptions, selectPlan } = useApp();
   const [billing, setBilling] = useState<'monthly' | 'yearly' | 'twoYear'>((selectedPlan?.billing as any) || 'twoYear');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -43,8 +43,9 @@ export default function CheckoutView({ selectedPlan, cartItems = [], onPurchaseC
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [localPlan, setLocalPlan] = useState(selectedPlan);
 
-  const activePlan = selectedPlan;
+  const activePlan = localPlan;
   const isVPS = activePlan && activePlan.name in VPS_SPECS;
   const specs = isVPS ? VPS_SPECS[activePlan!.name] : null;
   const prices = isVPS ? VPS_PRICING[activePlan!.name] : null;
@@ -124,13 +125,36 @@ export default function CheckoutView({ selectedPlan, cartItems = [], onPurchaseC
   if (isEmpty) {
     return (
       <div className="animate-fade-in p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-        <div className="text-center py-20">
-          <ShoppingCart className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Your cart is empty</h2>
-          <p className="text-slate-500 text-sm mb-8">Nothing to checkout. Choose a hosting plan to get started.</p>
-          <Link href="/" className="bg-[#00459c] hover:bg-[#003882] text-white font-bold text-xs uppercase tracking-wider px-6 py-3 transition-colors inline-block">
-            View Hosting Plans
-          </Link>
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Choose Your VPS Plan</h1>
+          <p className="text-slate-500 text-sm mt-1">Select a hosting plan to deploy your server.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(VPS_SPECS).map(([name, specs]) => {
+            const prices = VPS_PRICING[name];
+            return (
+              <div key={name} className="bg-white border border-slate-200 p-6 shadow-sm hover:border-[#00459c]/40 hover:shadow-md transition-all">
+                <div className="text-sm font-extrabold text-slate-900 mb-3">{name}</div>
+                <div className="space-y-1.5 text-xs text-slate-500 mb-4">
+                  <div className="flex items-center gap-2"><Cpu className="w-3.5 h-3.5 text-slate-400" /> {specs.vcpu} vCPU</div>
+                  <div className="flex items-center gap-2"><HardDrive className="w-3.5 h-3.5 text-slate-400" /> {specs.ram} RAM</div>
+                  <div className="flex items-center gap-2"><Server className="w-3.5 h-3.5 text-slate-400" /> {specs.disk}</div>
+                  <div className="flex items-center gap-2"><Network className="w-3.5 h-3.5 text-slate-400" /> {specs.bandwidth}</div>
+                </div>
+                <div className="text-lg font-extrabold text-[#00459c] mb-3">₹{prices.twoYear.toLocaleString('en-IN')}<span className="text-xs font-normal text-slate-400">/mo</span></div>
+                <button
+                  onClick={() => {
+                    selectPlan(name, prices.twoYear);
+                    setLocalPlan({ name, price: prices.twoYear });
+                  }}
+                  className="w-full bg-[#00459c] hover:bg-[#003882] text-white font-bold text-xs uppercase tracking-wider py-2.5 transition-colors cursor-pointer"
+                >
+                  Select Plan
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     );

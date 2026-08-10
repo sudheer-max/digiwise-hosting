@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Rocket, GitBranch, Box, Copy, Check, ChevronRight, Plus, Globe, ExternalLink, Github } from 'lucide-react';
+import { Rocket, GitBranch, Box, Copy, Check, ChevronRight, Plus, Globe, ExternalLink, Github, ShoppingCart } from 'lucide-react';
 import { useConsole } from '../ConsoleShell';
 import { SectionHeader, Loader, EmptyState, ErrorBanner, StatusPill, CopyField, PrimaryButton, GhostButton } from '../ui';
 import CreateApplicationWizard from '../CreateApplicationWizard';
 
 export default function ApplicationsView() {
   const { data, navigate } = useConsole();
-  const { projects, loading, error, refresh } = data;
+  const { projects, loading, error, refresh, hasPaidPlan } = data;
   const [showCreate, setShowCreate] = useState(false);
 
   const apps = (projects || []).flatMap((p) =>
@@ -22,7 +22,15 @@ export default function ApplicationsView() {
       <SectionHeader
         title="Applications"
         subtitle={`${apps.length} application(s) across all your projects.`}
-        action={<PrimaryButton onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> New Application</PrimaryButton>}
+        action={
+          hasPaidPlan ? (
+            <PrimaryButton onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> New Application</PrimaryButton>
+          ) : (
+            <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-2 transition-colors">
+              <ShoppingCart className="w-4 h-4" /> Purchase Plan to Deploy
+            </a>
+          )
+        }
       />
 
       {showCreate && <CreateApplicationWizard onClose={() => setShowCreate(false)} onCreated={() => refresh()} />}

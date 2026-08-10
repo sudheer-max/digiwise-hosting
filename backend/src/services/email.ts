@@ -235,3 +235,115 @@ export async function sendHostingConfirmation(params: {
     return { success: false, error: err.message };
   }
 }
+
+export async function sendInvoiceEmail(params: {
+  email: string;
+  name: string;
+  planName: string;
+  billing: string;
+  monthlyPrice: number;
+  months: number;
+  totalAmount: number;
+  orderId: string;
+  paymentId: string;
+  date: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      return { success: false, error: 'RESEND_API_KEY not set' };
+    }
+
+    const { Resend } = await import('resend');
+    const resend = new Resend(resendApiKey);
+
+    const billingLabel = params.billing === 'monthly' ? 'Monthly' : params.billing === 'yearly' ? '12 Months' : '24 Months';
+    const savings = params.monthlyPrice * params.months > params.totalAmount
+      ? (params.monthlyPrice * params.months - params.totalAmount)
+      : 0;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f4f6f9;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background: #f4f6f9; padding: 40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+
+        <tr>
+          <td style="background: linear-gradient(135deg, #00459c 0%, #002866 100%); padding: 32px; text-align: center;">
+            <h1 style="color: #ffffff; font-size: 22px; margin: 0 0 4px;">DigiWise Hosting</h1>
+            <p style="color: rgba(255,255,255,0.7); font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 2px;">Payment Invoice</p>
+          </td>
+        </tr>
+
+        <tr><td style="padding: 32px;">
+          <p style="font-size: 14px; color: #475569; margin: 0 0 24px;">
+            Hello <strong>${params.name}</strong>, your payment has been received successfully.
+          </p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="background: #f8fafc; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0;">
+            <tr><td>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr><td colspan="2" style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">Invoice Details</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Invoice Number</td><td style="font-size: 13px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0;">#${params.orderId}</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Date</td><td style="font-size: 13px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0;">${params.date}</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Payment ID</td><td style="font-size: 12px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0; font-family: monospace;">${params.paymentId}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px; background: #f8fafc; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0;">
+            <tr><td>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr><td colspan="2" style="font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">Plan Details</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Plan</td><td style="font-size: 13px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0;">${params.planName}</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Billing Cycle</td><td style="font-size: 13px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0;">${billingLabel}</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Monthly Rate</td><td style="font-size: 13px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0;">₹${params.monthlyPrice.toLocaleString('en-IN')}/mo</td></tr>
+                <tr><td style="font-size: 13px; color: #64748b; padding: 10px 0 0;">Duration</td><td style="font-size: 13px; color: #1a1a2e; font-weight: 600; text-align: right; padding: 10px 0 0;">${params.months} month${params.months > 1 ? 's' : ''}</td></tr>
+                ${savings > 0 ? `<tr><td style="font-size: 13px; color: #059669; padding: 10px 0 0;">Savings</td><td style="font-size: 13px; color: #059669; font-weight: 600; text-align: right; padding: 10px 0 0;">-₹${savings.toLocaleString('en-IN')}</td></tr>` : ''}
+              </table>
+            </td></tr>
+          </table>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px; background: linear-gradient(135deg, #002866 0%, #00459c 100%); border-radius: 12px; padding: 24px;">
+            <tr><td>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr><td style="font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 600;">Total Paid</td><td style="font-size: 24px; color: #ffffff; font-weight: 800; text-align: right;">₹${params.totalAmount.toLocaleString('en-IN')}</td></tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <p style="font-size: 12px; color: #94a3b8; margin: 24px 0 0; text-align: center;">
+            This is a computer-generated invoice. For questions, contact support@digiwisesoftech.com
+          </p>
+        </td></tr>
+
+        <tr><td style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+            DigiWise Softech — <a href="https://digiwisesoftech.com" style="color: #00459c;">digiwisesoftech.com</a>
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    const fromEmail = process.env.SMTP_FROM || 'noreply@digiwisesoftech.com';
+    await resend.emails.send({
+      from: fromEmail,
+      to: params.email,
+      subject: `[DigiWise Hosting] Invoice #${params.orderId} — ${params.planName}`,
+      html,
+    });
+
+    console.log(`[Email] Sent invoice to ${params.email} — Order #${params.orderId}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error(`[Email] Failed to send invoice to ${params.email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}

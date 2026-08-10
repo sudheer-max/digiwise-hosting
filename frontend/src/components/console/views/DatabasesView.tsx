@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Database, Plus, Loader2, ChevronRight, Trash2 } from 'lucide-react';
+import { Database, Plus, Loader2, ChevronRight, Trash2, ShoppingCart } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import { SectionHeader, PrimaryButton, GhostButton, Loader, EmptyState, ErrorBanner, StatusPill, Modal, ConfirmDeleteDialog } from '../ui';
@@ -20,7 +20,7 @@ const DB_SIZES = [
 
 export default function DatabasesView() {
   const { data, navigate } = useConsole();
-  const { projects, loading, error, refresh } = data;
+  const { projects, loading, error, refresh, hasPaidPlan } = data;
   const [showCreate, setShowCreate] = useState(false);
   const [dbType, setDbType] = useState('postgresql');
   const [dbName, setDbName] = useState('');
@@ -103,9 +103,15 @@ export default function DatabasesView() {
         title="Databases"
         subtitle={`${databases.length} database(s) across all projects.`}
         action={
-          <PrimaryButton onClick={() => setShowCreate(true)} disabled={namespaceOptions.length === 0}>
-            <Plus className="w-4 h-4" /> New Database
-          </PrimaryButton>
+          hasPaidPlan ? (
+            <PrimaryButton onClick={() => setShowCreate(true)} disabled={namespaceOptions.length === 0}>
+              <Plus className="w-4 h-4" /> New Database
+            </PrimaryButton>
+          ) : (
+            <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-2 transition-colors">
+              <ShoppingCart className="w-4 h-4" /> Purchase Plan to Create
+            </a>
+          )
         }
       />
 
@@ -196,8 +202,8 @@ export default function DatabasesView() {
           <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
             Provision a managed PostgreSQL, MySQL, MongoDB, or Redis instance for your applications.
           </p>
-          <PrimaryButton onClick={() => setShowCreate(true)} disabled={namespaceOptions.length === 0}>
-            <Plus className="w-4 h-4" /> Create Database
+          <PrimaryButton onClick={() => hasPaidPlan ? setShowCreate(true) : window.location.href = '/checkout'} disabled={!hasPaidPlan && namespaceOptions.length === 0}>
+            <Plus className="w-4 h-4" /> {hasPaidPlan ? 'Create Database' : 'Purchase Plan'}
           </PrimaryButton>
         </div>
       ) : (

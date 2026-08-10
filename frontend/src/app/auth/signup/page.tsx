@@ -7,7 +7,7 @@ import AuthView from '../../../components/AuthView';
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || '/console';
+  const returnTo = searchParams.get('returnTo') || '/checkout';
 
   const handleAuthSuccess = (email: string) => {
     router.push(returnTo);

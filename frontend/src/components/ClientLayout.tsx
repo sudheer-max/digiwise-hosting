@@ -29,7 +29,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       router.replace('/auth/login');
     }
     if (user && !loading && (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup'))) {
-      router.replace('/console');
+      router.replace('/checkout');
     }
   }, [user, loading, isPublicRoute, router, pathname]);
 
