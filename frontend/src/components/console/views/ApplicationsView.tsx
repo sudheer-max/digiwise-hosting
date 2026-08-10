@@ -33,7 +33,7 @@ export default function ApplicationsView() {
         }
       />
 
-      {showCreate && <CreateApplicationWizard onClose={() => setShowCreate(false)} onCreated={() => refresh()} />}
+      {showCreate && hasPaidPlan && <CreateApplicationWizard onClose={() => setShowCreate(false)} onCreated={() => refresh()} />}
 
       {error && <ErrorBanner message={error} onRetry={refresh} />}
 
@@ -47,9 +47,15 @@ export default function ApplicationsView() {
             Deploy a web service from an app image, GitHub repository, or use a template to get started in seconds.
           </p>
           <div className="flex items-center justify-center gap-3">
-            <PrimaryButton onClick={() => setShowCreate(true)}>
-              <Plus className="w-4 h-4" /> Deploy Application
-            </PrimaryButton>
+            {hasPaidPlan ? (
+              <PrimaryButton onClick={() => setShowCreate(true)}>
+                <Plus className="w-4 h-4" /> Deploy Application
+              </PrimaryButton>
+            ) : (
+              <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 transition-colors">
+                <ShoppingCart className="w-4 h-4" /> Purchase Plan to Deploy
+              </a>
+            )}
           </div>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
             <div className="bg-slate-50 border border-slate-200 p-4">
