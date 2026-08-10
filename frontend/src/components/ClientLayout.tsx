@@ -28,7 +28,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     if (!user && !loading && !isPublicRoute) {
       router.replace('/auth/login');
     }
-  }, [user, loading, isPublicRoute, router]);
+    if (user && !loading && (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup'))) {
+      router.replace('/console');
+    }
+  }, [user, loading, isPublicRoute, router, pathname]);
 
   if (loading) {
     return (
