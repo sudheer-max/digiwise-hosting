@@ -2,7 +2,7 @@
 import {
   Mail, Plus, Trash2, KeyRound, ShieldCheck, HardDrive, Inbox, ExternalLink,
   Monitor, Smartphone, Laptop, Copy, Check, ChevronDown, ChevronUp,
-  Server, Settings, Globe, ShoppingCart
+  Server, Settings, Globe, ShoppingCart, ListOrdered, Link2
 } from 'lucide-react';
 import api from '../lib/api';
 
@@ -150,13 +150,10 @@ const EMAIL_CLIENTS: SetupGuide[] = [
 export default function EmailView() {
   const [plan, setPlan] = useState<any>(null);
   const [planLoading, setPlanLoading] = useState(true);
-  const [emails, setEmails] = useState<EmailAccount[]>([
-    { address: 'admin@digiwisesoftech.com', status: 'ACTIVE', storageUsed: 0, storageTotal: 10, protocols: 'IMAP/SMTP' },
-    { address: 'support@digiwisesoftech.com', status: 'ACTIVE', storageUsed: 0, storageTotal: 5, protocols: 'IMAP/SMTP' },
-  ]);
+  const [emails, setEmails] = useState<EmailAccount[]>([]);
   const [newUsername, setNewUsername] = useState('');
-  const [newDomain, setNewDomain] = useState('digiwisesoftech.com');
-  const [newStorage, setNewStorage] = useState(5);
+  const [newDomain, setNewDomain] = useState('');
+  const [newStorage, setNewStorage] = useState(128);
   const [newPassword, setNewPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
@@ -251,7 +248,7 @@ export default function EmailView() {
         </div>
         <div className={`${card} p-5`}>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Allocated Storage</span>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{totalStorageUsed.toFixed(1)} GB of {totalStorageAllocated} GB</div>
+          <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{totalStorageUsed} MB of {totalStorageAllocated} MB</div>
           <div className="w-full h-1.5 bg-slate-100 mt-3 overflow-hidden">
             <div className="h-full bg-emerald-500" style={{ width: `${(totalStorageUsed / totalStorageAllocated) * 100}%` }}></div>
           </div>
@@ -288,14 +285,14 @@ export default function EmailView() {
             </div>
             <div>
               <label className={labelCls}>Domain Name</label>
-              <select value={newDomain} onChange={(e) => setNewDomain(e.target.value)} className={selectCls}>
-                <option value="digiwisesoftech.com">digiwisesoftech.com</option>
-                <option value="digiwise.io">digiwise.io</option>
-              </select>
+              <input type="text" placeholder="yourdomain.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} className={inputCls} required />
             </div>
             <div>
-              <label className={labelCls}>Storage Limit (GB)</label>
-              <input type="number" min="1" max="25" value={newStorage} onChange={(e) => setNewStorage(Number(e.target.value))} className={inputCls} required />
+              <label className={labelCls}>Storage Limit (MB)</label>
+              <select value={newStorage} onChange={(e) => setNewStorage(Number(e.target.value))} className={selectCls}>
+                <option value={128}>128 MB</option>
+                <option value={256}>256 MB</option>
+              </select>
             </div>
             <div>
               <label className={labelCls}>Secure Password</label>
@@ -340,7 +337,7 @@ export default function EmailView() {
                     <td className="py-4 px-2">
                       <div className="w-36">
                         <div className="flex justify-between text-[10px] text-slate-500 font-mono mb-1">
-                          <span>{email.storageUsed.toFixed(1)} / {email.storageTotal} GB</span>
+                           <span>{email.storageUsed} / {email.storageTotal} MB</span>
                           <span>{percent.toFixed(0)}%</span>
                         </div>
                         <div className="w-full h-1 bg-slate-100 overflow-hidden">
@@ -366,6 +363,168 @@ export default function EmailView() {
           </table>
         </div>
       </div>
+
+      {/* DNS CONFIGURATION */}
+      {(() => {
+        const uniqueDomains = [...new Set(emails.map(e => e.address.split('@')[1]))];
+        if (uniqueDomains.length === 0) return null;
+        return (
+          <div className={`${card} p-6`}>
+            <div className="flex items-center gap-3 mb-4">
+              <Link2 className="w-5 h-5 text-[#00459c]" />
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">DNS Configuration</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Add these records to your domain DNS to receive email.</p>
+              </div>
+            </div>
+            {uniqueDomains.map((domain) => {
+              const domainId = `dns-${domain}`;
+              const isExpanded = expandedGuide === domainId;
+              return (
+                <div key={domain} className="border border-slate-200 mb-3 last:mb-0">
+                  <button
+                    onClick={() => setExpandedGuide(isExpanded ? null : domainId)}
+                    className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-4 h-4 text-[#00459c]" />
+                      <span className="font-bold text-slate-900 text-sm">{domain}</span>
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 uppercase tracking-wider">Needs Setup</span>
+                    </div>
+                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                  </button>
+                  {isExpanded && (
+                    <div className="border-t border-slate-200 bg-slate-50/30 p-5 space-y-4">
+                      <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-4 py-2.5 font-semibold">
+                        Add the following records at your domain registrar (e.g., GoDaddy, Namecheap, Cloudflare).
+                      </div>
+                      <div className="space-y-3">
+                        {/* MX Record */}
+                        <div className="bg-white border border-slate-200 overflow-hidden">
+                          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
+                              <span className="ml-2 text-xs font-bold text-slate-900 bg-[#00459c]/10 text-[#00459c] px-2 py-0.5">MX</span>
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Priority 10</span>
+                          </div>
+                          <div className="px-4 py-2.5 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">@</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">mail.digiwisesoftech.com</span>
+                              </div>
+                            </div>
+                            <button onClick={() => copyToClipboard('mail.digiwisesoftech.com', `mx-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
+                              {copiedField === `mx-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        {/* SPF Record */}
+                        <div className="bg-white border border-slate-200 overflow-hidden">
+                          <div className="px-4 py-2.5 border-b border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
+                            <span className="ml-2 text-xs font-bold text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5">TXT</span>
+                          </div>
+                          <div className="px-4 py-2.5 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">@</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">"v=spf1 mx a ip4:172.105.49.201 ~all"</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold">SPF — Authorize our server to send email on your behalf.</div>
+                            </div>
+                            <button onClick={() => copyToClipboard('v=spf1 mx a ip4:172.105.49.201 ~all', `spf-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
+                              {copiedField === `spf-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        {/* DKIM Record */}
+                        <div className="bg-white border border-slate-200 overflow-hidden">
+                          <div className="px-4 py-2.5 border-b border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
+                            <span className="ml-2 text-xs font-bold text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5">TXT</span>
+                          </div>
+                          <div className="px-4 py-2.5 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">default._domainkey</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
+                                <span className="text-xs font-mono font-bold text-slate-900 break-all">v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3QEKyU1fSma0N3M4...</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold">DKIM — Cryptographically signs outgoing email to prevent spoofing.</div>
+                            </div>
+                            <button onClick={() => copyToClipboard('v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3QEKyU1fSma0N3M4...', `dkim-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
+                              {copiedField === `dkim-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        {/* DMARC Record */}
+                        <div className="bg-white border border-slate-200 overflow-hidden">
+                          <div className="px-4 py-2.5 border-b border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
+                            <span className="ml-2 text-xs font-bold text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5">TXT</span>
+                          </div>
+                          <div className="px-4 py-2.5 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">_dmarc</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">v=DMARC1; p=quarantine; rua=mailto:dmarc@{domain}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold">DMARC — Policy for handling unauthenticated email sent from your domain.</div>
+                            </div>
+                            <button onClick={() => copyToClipboard(`v=DMARC1; p=quarantine; rua=mailto:dmarc@${domain}`, `dmarc-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
+                              {copiedField === `dmarc-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                        {/* A Record for mail subdomain */}
+                        <div className="bg-white border border-slate-200 overflow-hidden">
+                          <div className="px-4 py-2.5 border-b border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
+                            <span className="ml-2 text-xs font-bold text-slate-900 bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5">A</span>
+                          </div>
+                          <div className="px-4 py-2.5 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">mail</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
+                                <span className="text-xs font-mono font-bold text-slate-900">172.105.49.201</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-semibold">A Record — Points mail.{domain} to our mail server IP.</div>
+                            </div>
+                            <button onClick={() => copyToClipboard('172.105.49.201', `a-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
+                              {copiedField === `a-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* EMAIL CLIENT SETUP GUIDES */}
       <div className="space-y-4">
