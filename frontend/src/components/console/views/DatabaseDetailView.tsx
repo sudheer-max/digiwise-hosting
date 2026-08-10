@@ -156,7 +156,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     { id: 'connect', label: 'Connect', icon: <Plug className="w-3.5 h-3.5" /> },
     { id: 'credentials', label: 'Credentials', icon: <Lock className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
-    ...(dbType === 'mongodb' || dbType === 'postgresql' ? [{ id: 'migrate' as Tab, label: 'Migrate Data', icon: <ArrowDownToLine className="w-3.5 h-3.5" /> }] : []),
+    ...(type === 'mongodb' || type === 'postgresql' ? [{ id: 'migrate' as Tab, label: 'Migrate Data', icon: <ArrowDownToLine className="w-3.5 h-3.5" /> }] : []),
     { id: 'advanced', label: 'Advanced', icon: <Database className="w-3.5 h-3.5" /> },
   ];
 
@@ -373,7 +373,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
       )}
 
       {/* Migrate Tab */}
-      {tab === 'migrate' && (dbType === 'mongodb' || dbType === 'postgresql') && (
+      {tab === 'migrate' && (type === 'mongodb' || type === 'postgresql') && (
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 shadow-sm p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -381,24 +381,24 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
                 <ArrowDownToLine className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Migrate from {dbType === 'mongodb' ? 'MongoDB Atlas, Railway, or other provider' : 'Railway, Heroku, or other provider'}</h3>
-                <p className="text-[11px] text-slate-400">Import all {dbType === 'mongodb' ? 'collections and documents' : 'tables and data'} from an external {dbType === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} into this database.</p>
+                <h3 className="text-sm font-bold text-slate-900">Migrate from {type === 'mongodb' ? 'MongoDB Atlas, Railway, or other provider' : 'Railway, Heroku, or other provider'}</h3>
+                <p className="text-[11px] text-slate-400">Import all {type === 'mongodb' ? 'collections and documents' : 'tables and data'} from an external {type === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} into this database.</p>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source {dbType === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} Connection URI *</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Source {type === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} Connection URI *</label>
                 <input
                   type="text"
                   value={migrateUri}
                   onChange={(e) => setMigrateUri(e.target.value)}
-                  placeholder={dbType === 'mongodb' ? 'mongodb://username:password@host:5432/dbname?authSource=admin' : 'postgresql://username:password@host:5432/dbname'}
+                  placeholder={type === 'mongodb' ? 'mongodb://username:password@host:5432/dbname?authSource=admin' : 'postgresql://username:password@host:5432/dbname'}
                   className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
                   disabled={migrateBusy}
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  {dbType === 'mongodb'
+                  {type === 'mongodb'
                     ? 'Find this in Railway dashboard → your database → Variables → MONGO_URL or MONGODB_URI'
                     : 'Find this in Railway dashboard → your database → Variables → DATABASE_URL'}
                 </p>
@@ -437,9 +437,9 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
           <div className="bg-white border border-slate-200 shadow-sm p-5">
             <h3 className="text-sm font-bold text-slate-900 mb-3">How it works</h3>
             <ol className="text-xs text-slate-500 space-y-2 list-decimal list-inside">
-              <li>DigiWise connects to your source {dbType === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} (Railway, Atlas, etc.)</li>
-              <li>Dumps all {dbType === 'mongodb' ? 'collections and documents' : 'tables and data'} using <code>{dbType === 'mongodb' ? 'mongodump' : 'pg_dump'}</code></li>
-              <li>Restores everything into this database using <code>{dbType === 'mongodb' ? 'mongorestore' : 'pg_restore'}</code></li>
+              <li>DigiWise connects to your source {type === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} (Railway, Atlas, etc.)</li>
+              <li>Dumps all {type === 'mongodb' ? 'collections and documents' : 'tables and data'} using <code>{type === 'mongodb' ? 'mongodump' : 'pg_dump'}</code></li>
+              <li>Restores everything into this database using <code>{type === 'mongodb' ? 'mongorestore' : 'pg_restore'}</code></li>
               <li>Cleans up temporary files</li>
             </ol>
             <p className="text-[10px] text-slate-400 mt-3">

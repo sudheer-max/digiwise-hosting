@@ -1,4 +1,4 @@
-const CACHE_NAME = 'digiwise-v3';
+const CACHE_NAME = 'digiwise-v4';
 const STATIC_ASSETS = [
   '/favicon.png',
   '/DIGIWISE-SOFTECH-LOGO.png',

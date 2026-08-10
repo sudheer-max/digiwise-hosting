@@ -160,6 +160,28 @@ export async function databaseRoutes(app: FastifyInstance) {
       }
     } catch { /* Ignore errors */ }
 
+    // MongoDB instances (simple StatefulSet fallback)
+    try {
+      const stsRes: any = await k8s.k8sAppsApi.listNamespacedStatefulSet({ namespace });
+      const stsItems = stsRes.items || (stsRes.body && stsRes.body.items) || [];
+      const existingMongoNames = new Set(databases.filter(d => d.type === 'mongodb').map(d => d.name));
+      for (const sts of stsItems) {
+        const stsName = sts.metadata?.name || '';
+        if (existingMongoNames.has(stsName)) continue;
+        const image = sts.spec?.template?.spec?.containers?.[0]?.image || '';
+        if (image.includes('mongo')) {
+          const readyReplicas = sts.status?.readyReplicas || 0;
+          const replicas = sts.spec?.replicas || 1;
+          databases.push({
+            type: 'mongodb',
+            name: stsName,
+            status: readyReplicas >= replicas ? 'Running' : 'Pending',
+            namespace,
+          });
+        }
+      }
+    } catch { /* Ignore errors */ }
+
     // MySQL instances (MySQL Operator - InnoDBCluster)
     try {
       const res: any = await k8s.k8sCustomApi.listNamespacedCustomObject({
@@ -273,9 +295,17 @@ export async function databaseRoutes(app: FastifyInstance) {
           group: 'postgresql.cnpg.io', version: 'v1', namespace, plural: 'clusters', name,
         });
       } else if (type === 'mongodb') {
-        await k8s.k8sCustomApi.deleteNamespacedCustomObject({
-          group: 'psmdb.percona.com', version: 'v1', namespace, plural: 'perconaservermongodbs', name,
-        });
+        // Try Percona CRD first, then simple StatefulSet
+        try {
+          await k8s.k8sCustomApi.deleteNamespacedCustomObject({
+            group: 'psmdb.percona.com', version: 'v1', namespace, plural: 'perconaservermongodbs', name,
+          });
+        } catch {
+          // Simple StatefulSet deployment
+          await k8s.k8sAppsApi.deleteNamespacedStatefulSet({ name, namespace }).catch(() => {});
+          await k8s.k8sCoreApi.deleteNamespacedService({ name, namespace }).catch(() => {});
+          await k8s.k8sCoreApi.deleteNamespacedSecret({ name: `${name}-credentials`, namespace }).catch(() => {});
+        }
       } else if (type === 'mysql') {
         await k8s.k8sCustomApi.deleteNamespacedCustomObject({
           group: 'mysql.oracle.com', version: 'v2', namespace, plural: 'innodbclusters', name,
@@ -338,35 +368,52 @@ export async function databaseRoutes(app: FastifyInstance) {
     // Get target connection details
     const vars = await getDatabaseVariables(namespace, type, name);
 
-    // Find the database pod
+    // Find the database pod — try multiple label selectors and fallback to name match
     let podName = '';
-    try {
-      let labelSelector = '';
-      if (type === 'mongodb') {
-        labelSelector = `app.kubernetes.io/name=${name},app.kubernetes.io/component=rs0`;
-      } else if (type === 'postgresql') {
-        labelSelector = `cnpg.io/cluster=${name}`;
-      }
+    const labelSelectors: string[] = [];
+    if (type === 'mongodb') {
+      // Percona MongoDB pod labels vary by version
+      labelSelectors.push(
+        `app.kubernetes.io/name=${name},app.kubernetes.io/component=rs0`,
+        `app.kubernetes.io/instance=${name}`,
+        `app=${name}-rs0`,
+        `percona.com/cluster=${name}`,
+      );
+    } else if (type === 'postgresql') {
+      labelSelectors.push(`cnpg.io/cluster=${name}`);
+    }
 
-      const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({
-        namespace,
-        ...(labelSelector ? { labelSelector } : {}),
-      });
-      const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
-      const running = items.find((p: any) => p.status?.phase === 'Running');
-      podName = running?.metadata?.name || items[0]?.metadata?.name || '';
-    } catch {
-      // Fallback: try listing pods with name filter
+    for (const ls of labelSelectors) {
+      if (podName) break;
+      try {
+        const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({ namespace, labelSelector: ls });
+        const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
+        const running = items.find((p: any) => p.status?.phase === 'Running');
+        podName = running?.metadata?.name || items[0]?.metadata?.name || '';
+      } catch { /* try next selector */ }
+    }
+
+    // Fallback: list all pods and find one matching the database name
+    if (!podName) {
       try {
         const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({ namespace });
         const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
-        const found = items.find((p: any) => p.metadata?.name?.includes(name) && p.status?.phase === 'Running');
-        podName = found?.metadata?.name || '';
+        const running = items.find((p: any) =>
+          p.status?.phase === 'Running' && (
+            p.metadata?.name?.includes(name) ||
+            p.metadata?.name?.startsWith(`${name}-`)
+          )
+        );
+        podName = running?.metadata?.name || '';
       } catch { /* continue */ }
     }
 
     if (!podName) {
-      return reply.status(404).send({ error: `${type === 'mongodb' ? 'MongoDB' : 'PostgreSQL'} pod not found. Is the database running?` });
+      const prettyName = type === 'mongodb' ? 'MongoDB' : 'PostgreSQL';
+      return reply.status(404).send({
+        error: `${prettyName} pod not found. Is the database running?`,
+        hint: `No running pods found in namespace "${namespace}" matching database "${name}". Check the operator status and pod logs.`,
+      });
     }
 
     try {
@@ -473,52 +520,77 @@ async function createPostgresInstance(namespace: string, name: string, resources
 }
 
 async function createMongoInstance(namespace: string, name: string, resources: { cpu: string; memory: string; storage: string }) {
-  // Create MongoDB instance using Percona CRD
-  const mongoCRD = {
-    apiVersion: 'psmdb.percona.com/v1',
-    kind: 'PerconaServerMongoDB',
-    metadata: {
-      name: name,
-      namespace: namespace,
+  const rootPassword = `Pw_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 8)}`;
+
+  // Create credentials secret
+  await k8s.k8sCoreApi.createNamespacedSecret({
+    namespace,
+    body: {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { name: `${name}-credentials`, namespace },
+      type: 'Opaque',
+      stringData: {
+        MONGO_INITDB_ROOT_USERNAME: 'mongodb',
+        MONGO_INITDB_ROOT_PASSWORD: rootPassword,
+      },
     },
+  });
+
+  // Create StatefulSet with official mongo image (no Percona dependency)
+  const statefulSet = {
+    apiVersion: 'apps/v1',
+    kind: 'StatefulSet',
+    metadata: { name, namespace },
     spec: {
-      image: 'percona/percona-server-mongodb:6.0',
-      imagePullPolicy: 'IfNotPresent',
-      replsets: [
-        {
-          name: 'rs0',
-          size: 1,
-          resources: {
-            requests: {
-              cpu: resources.cpu,
-              memory: resources.memory,
+      serviceName: name,
+      replicas: 1,
+      selector: { matchLabels: { app: name } },
+      template: {
+        metadata: { labels: { app: name } },
+        spec: {
+          containers: [{
+            name: 'mongod',
+            image: 'mongo:6.0',
+            ports: [{ containerPort: 27017 }],
+            env: [
+              { name: 'MONGO_INITDB_ROOT_USERNAME', valueFrom: { secretKeyRef: { name: `${name}-credentials`, key: 'MONGO_INITDB_ROOT_USERNAME' } } },
+              { name: 'MONGO_INITDB_ROOT_PASSWORD', valueFrom: { secretKeyRef: { name: `${name}-credentials`, key: 'MONGO_INITDB_ROOT_PASSWORD' } } },
+            ],
+            volumeMounts: [{ name: 'data', mountPath: '/data/db' }],
+            resources: {
+              requests: { cpu: '250m', memory: '512Mi' },
+              limits: { cpu: resources.cpu, memory: resources.memory },
             },
-            limits: {
-              cpu: resources.cpu,
-              memory: resources.memory,
-            },
-          },
-          volumeSpec: {
-            persistentVolumeClaim: {
-              resources: {
-                requests: {
-                  storage: resources.storage,
-                },
-              },
-            },
-          },
+          }],
         },
-      ],
+      },
+      volumeClaimTemplates: [{
+        metadata: { name: 'data' },
+        spec: {
+          accessModes: ['ReadWriteOnce'],
+          storageClassName: 'local-path',
+          resources: { requests: { storage: resources.storage } },
+        },
+      }],
     },
   };
 
-  await k8s.k8sCustomApi.createNamespacedCustomObject({
-    group: 'psmdb.percona.com',
-    version: 'v1',
-    namespace,
-    plural: 'perconaservermongodbs',
-    body: mongoCRD,
-  });
+  await k8s.k8sAppsApi.createNamespacedStatefulSet({ namespace, body: statefulSet });
+
+  // Create headless Service
+  const service = {
+    apiVersion: 'v1',
+    kind: 'Service',
+    metadata: { name, namespace },
+    spec: {
+      selector: { app: name },
+      ports: [{ port: 27017, targetPort: 27017 }],
+      clusterIP: 'None',
+    },
+  };
+
+  await k8s.k8sCoreApi.createNamespacedService({ namespace, body: service });
 }
 
 async function createMysqlInstance(namespace: string, name: string, resources: { cpu: string; memory: string; storage: string }) {
@@ -656,35 +728,42 @@ async function getDatabaseVariables(namespace: string, type: string, name: strin
       // CloudNativePG stores credentials in {name}-app secret
       const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-app`, namespace });
       const data = secret.data || {};
-      username = Buffer.from(data['username'] || '').toString('base64') || 'postgres';
-      password = Buffer.from(data['password'] || '').toString('base64') || '';
-      databaseName = Buffer.from(data['db-name'] || '').toString('base64') || name;
+      username = Buffer.from(data['username'] || '', 'base64').toString('utf-8') || 'postgres';
+      password = Buffer.from(data['password'] || '', 'base64').toString('utf-8') || '';
+      databaseName = Buffer.from(data['db-name'] || '', 'base64').toString('utf-8') || name;
       host = `${name}-rw.${namespace}.svc.cluster.local`;
       port = def.port;
     } else if (type === 'mongodb') {
-      // Percona stores credentials in {name}-cluster-admin-{name} secret
+      // Simple mongo StatefulSet: credentials in {name}-credentials secret
       try {
-        const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-cluster-admin-${name}`, namespace });
+        const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-credentials`, namespace });
         const data = secret.data || {};
-        username = Buffer.from(data['MONGODB_BACKUP_USER'] || data['MONGODB_USER'] || '').toString('base64') || 'mongodb';
-        password = Buffer.from(data['MONGODB_BACKUP_PASSWORD'] || data['MONGODB_PASSWORD'] || '').toString('base64') || '';
+        username = Buffer.from(data['MONGO_INITDB_ROOT_USERNAME'] || '', 'base64').toString('utf-8') || 'mongodb';
+        password = Buffer.from(data['MONGO_INITDB_ROOT_PASSWORD'] || '', 'base64').toString('utf-8') || '';
       } catch {
         // Fallback: try Percona secrets
         try {
-          const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-secrets`, namespace });
+          const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-cluster-admin-${name}`, namespace });
           const data = secret.data || {};
-          username = Buffer.from(data['MONGODB_BACKUP_USER'] || '').toString('base64') || 'mongodb';
-          password = Buffer.from(data['MONGODB_BACKUP_PASSWORD'] || '').toString('base64') || '';
-        } catch { /* use defaults */ }
+          username = Buffer.from(data['MONGODB_BACKUP_USER'] || data['MONGODB_USER'] || '', 'base64').toString('utf-8') || 'mongodb';
+          password = Buffer.from(data['MONGODB_BACKUP_PASSWORD'] || data['MONGODB_PASSWORD'] || '', 'base64').toString('utf-8') || '';
+        } catch {
+          try {
+            const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-secrets`, namespace });
+            const data = secret.data || {};
+            username = Buffer.from(data['MONGODB_BACKUP_USER'] || '', 'base64').toString('utf-8') || 'mongodb';
+            password = Buffer.from(data['MONGODB_BACKUP_PASSWORD'] || '', 'base64').toString('utf-8') || '';
+          } catch { /* use defaults */ }
+        }
       }
-      host = `${name}-rs0.${namespace}.svc.cluster.local`;
+      host = `${name}.${namespace}.svc.cluster.local`;
       port = def.port;
     } else if (type === 'mysql') {
       // MySQL Operator stores credentials in {name}-secret
       const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-secret`, namespace });
       const data = secret.data || {};
-      username = Buffer.from(data['rootUser'] || '').toString('base64') || 'root';
-      password = Buffer.from(data['rootPassword'] || '').toString('base64') || '';
+      username = Buffer.from(data['rootUser'] || '', 'base64').toString('utf-8') || 'root';
+      password = Buffer.from(data['rootPassword'] || '', 'base64').toString('utf-8') || '';
       host = `${name}-router.${namespace}.svc.cluster.local`;
       port = def.port;
     } else if (type === 'redis') {
@@ -692,7 +771,7 @@ async function getDatabaseVariables(namespace: string, type: string, name: strin
       try {
         const secret = await k8s.k8sCoreApi.readNamespacedSecret({ name: `${name}-auth`, namespace });
         const data = secret.data || {};
-        password = Buffer.from(data['password'] || '').toString('base64') || '';
+        password = Buffer.from(data['password'] || '', 'base64').toString('utf-8') || '';
       } catch { /* no auth */ }
       username = def.user;
       host = `${name}.${namespace}.svc.cluster.local`;
@@ -709,7 +788,7 @@ async function getDatabaseVariables(namespace: string, type: string, name: strin
   const internalConnectionString = buildConnectionString(type, host, port, username, password, databaseName);
 
   // External access via port-forward command
-  const portForwardCmd = `kubectl port-forward -n ${namespace} svc/${type === 'postgresql' ? name + '-rw' : type === 'mongodb' ? name + '-rs0' : type === 'mysql' ? name + '-router' : name} ${port}:${port}`;
+  const portForwardCmd = `kubectl port-forward -n ${namespace} svc/${type === 'postgresql' ? name + '-rw' : type === 'mongodb' ? name : type === 'mysql' ? name + '-router' : name} ${port}:${port}`;
   const externalConnectionString = buildConnectionString(type, 'localhost', port, username, password, databaseName);
 
   // Environment variables
