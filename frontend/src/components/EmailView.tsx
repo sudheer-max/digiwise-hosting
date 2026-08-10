@@ -1,9 +1,10 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Mail, Plus, Trash2, KeyRound, ShieldCheck, HardDrive, Inbox, ExternalLink,
   Monitor, Smartphone, Laptop, Copy, Check, ChevronDown, ChevronUp,
-  Server, Settings, Globe
+  Server, Settings, Globe, ShoppingCart
 } from 'lucide-react';
+import api from '../lib/api';
 
 interface EmailAccount {
   address: string;
@@ -147,6 +148,8 @@ const EMAIL_CLIENTS: SetupGuide[] = [
 ];
 
 export default function EmailView() {
+  const [plan, setPlan] = useState<any>(null);
+  const [planLoading, setPlanLoading] = useState(true);
   const [emails, setEmails] = useState<EmailAccount[]>([
     { address: 'admin@digiwisesoftech.com', status: 'ACTIVE', storageUsed: 0, storageTotal: 10, protocols: 'IMAP/SMTP' },
     { address: 'support@digiwisesoftech.com', status: 'ACTIVE', storageUsed: 0, storageTotal: 5, protocols: 'IMAP/SMTP' },
@@ -158,6 +161,12 @@ export default function EmailView() {
   const [isCreating, setIsCreating] = useState(false);
   const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getPlan().then(p => setPlan(p)).catch(() => setPlan(null)).finally(() => setPlanLoading(false));
+  }, []);
+
+  const hasPaidPlan = plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active';
 
   const handleCreateEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,14 +212,34 @@ export default function EmailView() {
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">Business Email</h1>
           <p className="text-slate-500 text-sm mt-1">Provision, secure, and manage enterprise-grade email with dedicated storage.</p>
         </div>
-        <button
-          onClick={() => setIsCreating(!isCreating)}
-          className="bg-[#00459c] hover:bg-[#003882] text-white text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors flex items-center gap-1.5 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> Create Email Account
-        </button>
+        {hasPaidPlan ? (
+          <button
+            onClick={() => setIsCreating(!isCreating)}
+            className="bg-[#00459c] hover:bg-[#003882] text-white text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Create Email Account
+          </button>
+        ) : (
+          <a href="/checkout" className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors flex items-center gap-1.5">
+            <ShoppingCart className="w-4 h-4" /> Purchase Plan
+          </a>
+        )}
       </div>
 
+      {!hasPaidPlan && !planLoading && (
+        <div className="bg-white border border-slate-200 shadow-sm p-10 text-center">
+          <Mail className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Plan required</h3>
+          <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+            Purchase a VPS hosting plan to create and manage business email accounts.
+          </p>
+          <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 transition-colors">
+            <ShoppingCart className="w-4 h-4" /> Purchase Plan
+          </a>
+        </div>
+      )}
+
+      {hasPaidPlan && (<>
       {/* METRICS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className={`${card} p-5`}>
@@ -462,6 +491,7 @@ export default function EmailView() {
           Open Webmail Portal
         </a>
       </div>
+      </>)}
 
     </div>
   );
