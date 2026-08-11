@@ -712,7 +712,7 @@ export async function databaseRoutes(app: FastifyInstance) {
           stdio: ['pipe', 'pipe', 'pipe'],
         });
 
-        if (output.includes('0 document(s) restored')) {
+        if (output.includes('0 document(s) restored successfully') || output.includes('no target database was specified')) {
           throw new Error('Migration completed but 0 documents were restored. Check source connection.');
         }
       } else if (type === 'postgresql') {
