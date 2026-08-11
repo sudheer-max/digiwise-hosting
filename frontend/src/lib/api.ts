@@ -342,6 +342,14 @@ class ApiClient {
     return this.request(`/databases/${namespace}/${type}/${name}/health`);
   }
 
+  browseDatabase(namespace: string, type: string, name: string, table?: string, limit?: number) {
+    const params = new URLSearchParams();
+    if (table) params.set('table', table);
+    if (limit) params.set('limit', String(limit));
+    const qs = params.toString() ? `?${params}` : '';
+    return this.request(`/databases/${namespace}/${type}/${name}/browse${qs}`);
+  }
+
   migrateDatabase(namespace: string, type: string, name: string, sourceUri: string) {
     return this.request(`/databases/${namespace}/${type}/${name}/migrate`, {
       method: 'POST',

@@ -2,6 +2,8 @@
 import { prisma } from '../db/client.js';
 import * as k8s from '../services/kubernetes.js';
 import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export async function databaseRoutes(app: FastifyInstance) {
   // List database namespaces (PostgreSQL, MongoDB, Redis operators)
@@ -360,6 +362,93 @@ export async function databaseRoutes(app: FastifyInstance) {
     }
   });
 
+  // Browse database data (tables + rows)
+  app.get<{ Params: { namespace: string; type: string; name: string }; Querystring: { table?: string; limit?: string } }>('/api/databases/:namespace/:type/:name/browse', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Browse database tables and data',
+      params: { type: 'object', properties: { namespace: { type: 'string' }, type: { type: 'string' }, name: { type: 'string' } }, required: ['namespace', 'type', 'name'] },
+      querystring: { type: 'object', properties: { table: { type: 'string' }, limit: { type: 'string' } } },
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { namespace, type, name } = request.params;
+    const { table, limit: rowLimit } = request.query;
+    const limit = parseInt(rowLimit || '50', 10) || 50;
+
+    const project = user.role === 'admin'
+      ? await prisma.project.findFirst({ where: { k8sNamespace: namespace } })
+      : await prisma.project.findFirst({ where: { k8sNamespace: namespace, userId: user.id } });
+
+    if (!project) return reply.status(404).send({ error: 'Project namespace not found' });
+
+    try {
+      const vars = await getDatabaseVariables(namespace, type, name);
+      const podName = `${name}-1`;
+
+      if (type === 'postgresql') {
+        // List tables
+        const listCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -c "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"`;
+        const tableList = execSync(listCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
+
+        if (table) {
+          // Fetch rows from specific table
+          const dataCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -F '|' -c "SELECT * FROM ${table} LIMIT ${limit}"`;
+          const colCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -c "SELECT column_name FROM information_schema.columns WHERE table_name='${table}' AND table_schema='public' ORDER BY ordinal_position"`;
+          const countCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -c "SELECT count(*) FROM ${table}"`;
+
+          const columns = execSync(colCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
+          const rows = execSync(dataCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
+          const total = parseInt(execSync(countCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim(), 10);
+
+          return {
+            tables: tableList,
+            selectedTable: table,
+            columns,
+            rows: rows.map(r => r.split('|')),
+            total,
+            limit,
+          };
+        }
+
+        return { tables: tableList, selectedTable: null, columns: [], rows: [], total: 0 };
+      }
+
+      if (type === 'mongodb') {
+        // List collections
+        const listCmd = `kubectl exec -n ${namespace} ${podName} -- mongosh -u ${vars.username} -p ${vars.password} --authenticationDatabase admin ${vars.databaseName} --eval "db.getCollectionNames()" --quiet`;
+        const raw = execSync(listCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim();
+        const collections = raw.replace(/[\[\]"']/g, '').split(',').map(s => s.trim()).filter(Boolean);
+
+        if (table) {
+          const dataCmd = `kubectl exec -n ${namespace} ${podName} -- mongosh -u ${vars.username} -p ${vars.password} --authenticationDatabase admin ${vars.databaseName} --eval "JSON.stringify(db.${table}.find().limit(${limit}).toArray())" --quiet`;
+          const countCmd = `kubectl exec -n ${namespace} ${podName} -- mongosh -u ${vars.username} -p ${vars.password} --authenticationDatabase admin ${vars.databaseName} --eval "db.${table}.countDocuments()" --quiet`;
+
+          const rawData = execSync(dataCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim();
+          const rows = JSON.parse(rawData || '[]');
+          const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+          const total = parseInt(execSync(countCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim(), 10);
+
+          return {
+            tables: collections,
+            selectedTable: table,
+            columns,
+            rows,
+            total,
+            limit,
+          };
+        }
+
+        return { tables: collections, selectedTable: null, columns: [], rows: [], total: 0 };
+      }
+
+      return reply.status(400).send({ error: 'Data browsing only supported for PostgreSQL and MongoDB' });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
   // Delete a database instance
   app.delete<{ Params: { namespace: string; type: string; name: string } }>('/api/databases/:namespace/:type/:name', {
     schema: {
@@ -521,22 +610,30 @@ export async function databaseRoutes(app: FastifyInstance) {
       const dumpDir = `/tmp/migration-${Date.now()}`;
 
       if (type === 'mongodb') {
-        // MongoDB: mongodump + mongorestore
+        // MongoDB: mongodump + mongorestore via kubectl exec
         const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
-        const dumpCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mkdir -p ${dumpDir} && mongodump --uri=\\"${sourceUri}\\" --out=${dumpDir} --gzip"`;
-        execSync(dumpCmd, { timeout: 300000, encoding: 'utf-8' });
+        // Step 1: Dump from source
+        const dumpScript = `mkdir -p ${dumpDir} && mongodump --uri="${sourceUri}" --out=${dumpDir} --gzip`;
+        const dumpArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript];
+        execSync(`kubectl ${dumpArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
 
-        const restoreCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mongorestore --uri=\\"${targetUri}\\" --dir=${dumpDir} --gzip --drop"`;
-        execSync(restoreCmd, { timeout: 300000, encoding: 'utf-8' });
+        // Step 2: Restore to target
+        const restoreScript = `mongorestore --uri="${targetUri}" --dir=${dumpDir} --gzip --drop`;
+        const restoreArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript];
+        execSync(`kubectl ${restoreArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
 
-        execSync(`kubectl exec -n ${namespace} ${podName} -- bash -c "rm -rf ${dumpDir}"`, { timeout: 30000, encoding: 'utf-8' });
+        // Step 3: Cleanup
+        const cleanupScript = `rm -rf ${dumpDir}`;
+        const cleanupArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', cleanupScript];
+        execSync(`kubectl ${cleanupArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 30000, encoding: 'utf-8', stdio: 'pipe' });
       } else if (type === 'postgresql') {
         // PostgreSQL: pg_dump + pg_restore
         const dumpFile = `${dumpDir}/dump.sql`;
 
-        const dumpCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "mkdir -p ${dumpDir} && pg_dump \\"${sourceUri}\\" > ${dumpFile}"`;
-        execSync(dumpCmd, { timeout: 300000, encoding: 'utf-8' });
+        const dumpScript = `mkdir -p ${dumpDir} && pg_dump "${sourceUri}" > ${dumpFile}`;
+        const dumpArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript];
+        execSync(`kubectl ${dumpArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
 
         const targetHost = vars.host;
         const targetPort = vars.port;
@@ -544,10 +641,13 @@ export async function databaseRoutes(app: FastifyInstance) {
         const targetPass = vars.password;
         const targetDb = vars.databaseName;
 
-        const restoreCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "PGPASSWORD=\\"${targetPass}\\" pg_restore -h ${targetHost} -p ${targetPort} -U ${targetUser} -d ${targetDb} --clean --if-exists < ${dumpFile}"`;
-        execSync(restoreCmd, { timeout: 300000, encoding: 'utf-8' });
+        const restoreScript = `PGPASSWORD="${targetPass}" pg_restore -h ${targetHost} -p ${targetPort} -U ${targetUser} -d ${targetDb} --clean --if-exists < ${dumpFile}`;
+        const restoreArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript];
+        execSync(`kubectl ${restoreArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
 
-        execSync(`kubectl exec -n ${namespace} ${podName} -- bash -c "rm -rf ${dumpDir}"`, { timeout: 30000, encoding: 'utf-8' });
+        const cleanupScript = `rm -rf ${dumpDir}`;
+        const cleanupArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', cleanupScript];
+        execSync(`kubectl ${cleanupArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 30000, encoding: 'utf-8', stdio: 'pipe' });
       }
 
       return reply.status(200).send({

@@ -14,7 +14,7 @@ const DB_INFO: Record<string, { label: string; icon: string; color: string }> = 
   redis: { label: 'Redis', icon: '🔴', color: '#DC382D' },
 };
 
-type Tab = 'variables' | 'connect' | 'credentials' | 'logs' | 'advanced' | 'migrate';
+type Tab = 'variables' | 'connect' | 'credentials' | 'browse' | 'logs' | 'advanced' | 'migrate';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -69,6 +69,9 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const [logText, setLogText] = useState('');
   const [activeLang, setActiveLang] = useState('nodejs');
   const [connectNetwork, setConnectNetwork] = useState<'private' | 'public'>('private');
+  const [browseData, setBrowseData] = useState<any>(null);
+  const [browseTable, setBrowseTable] = useState('');
+  const [browseLoading, setBrowseLoading] = useState(false);
   const [migrateUri, setMigrateUri] = useState('');
   const [migrateBusy, setMigrateBusy] = useState(false);
   const [migrateResult, setMigrateResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -165,10 +168,22 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const publicConnStr = vars?.publicConnectionString || '';
   const envVars = vars?.envVars || {};
 
+  const loadBrowse = async (table?: string) => {
+    if (type !== 'postgresql' && type !== 'mongodb') return;
+    setBrowseLoading(true);
+    try {
+      const data = await api.browseDatabase(namespace, type, dbName, table);
+      setBrowseData(data);
+      if (table) setBrowseTable(table);
+    } catch { /* ignore */ }
+    setBrowseLoading(false);
+  };
+
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'variables', label: 'Variables', icon: <KeyRound className="w-3.5 h-3.5" /> },
     { id: 'connect', label: 'Connect', icon: <Plug className="w-3.5 h-3.5" /> },
     { id: 'credentials', label: 'Credentials', icon: <Lock className="w-3.5 h-3.5" /> },
+    { id: 'browse', label: 'Browse Data', icon: <Database className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
     ...(type === 'mongodb' || type === 'postgresql' ? [{ id: 'migrate' as Tab, label: 'Migrate Data', icon: <ArrowDownToLine className="w-3.5 h-3.5" /> }] : []),
     { id: 'advanced', label: 'Advanced', icon: <Database className="w-3.5 h-3.5" /> },
@@ -467,6 +482,78 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
               <ConnectionField label="Internal URL" value={connStr} />
               <ConnectionField label="External URL (via port-forward)" value={extConnStr} />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Browse Data Tab */}
+      {tab === 'browse' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Database className="w-4 h-4 text-[#00459c]" /> Browse Data
+              </h3>
+              <GhostButton onClick={() => loadBrowse(browseTable || undefined)}><RefreshCw className="w-3.5 h-3.5" /> Refresh</GhostButton>
+            </div>
+
+            {browseLoading && !browseData ? (
+              <p className="text-xs text-slate-400">Loading tables...</p>
+            ) : browseData?.tables?.length === 0 ? (
+              <p className="text-xs text-slate-400">No tables/collections found. Create some data first.</p>
+            ) : (
+              <div className="space-y-4">
+                {/* Table selector */}
+                <div className="flex flex-wrap gap-2">
+                  {(browseData?.tables || []).map((t: string) => (
+                    <button
+                      key={t}
+                      onClick={() => loadBrowse(t)}
+                      className={`px-3 py-1.5 text-xs font-bold border transition-colors cursor-pointer ${
+                        browseTable === t
+                          ? 'bg-[#00459c] text-white border-[#00459c]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Data table */}
+                {browseData?.selectedTable && browseData?.columns?.length > 0 ? (
+                  <div className="overflow-auto max-h-[60vh] border border-slate-200">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 bg-slate-50">
+                        <tr className="border-b border-slate-200">
+                          {browseData.columns.map((col: string) => (
+                            <th key={col} className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {browseData.rows.map((row: any, idx: number) => (
+                          <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
+                            {browseData.columns.map((col: string) => (
+                              <td key={col} className="px-3 py-2 text-xs font-mono text-slate-700 max-w-[300px] truncate">
+                                {typeof row === 'object' ? String(row[col] ?? '') : String(row)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-200">
+                      Showing {browseData.rows.length} of {browseData.total} rows
+                    </div>
+                  </div>
+                ) : browseData?.selectedTable && browseData?.rows?.length === 0 ? (
+                  <p className="text-xs text-slate-400">This table is empty.</p>
+                ) : (
+                  <p className="text-xs text-slate-400">Select a table to view its data.</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
