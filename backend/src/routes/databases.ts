@@ -693,27 +693,35 @@ export async function databaseRoutes(app: FastifyInstance) {
 
       if (type === 'mongodb') {
         // MongoDB: mongodump + mongorestore — ALL steps in a single kubectl exec
-        // Separate exec calls fail silently, so chain everything in one bash -c
         const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
         const script = [
           `rm -rf ${dumpDir}`,
           `mkdir -p ${dumpDir}`,
-          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`,
+          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip 2>&1`,
           `rm -rf ${dumpDir}/admin ${dumpDir}/config ${dumpDir}/local`,
           `cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "${vars.databaseName}" ]; then mv "$n" ${vars.databaseName}; break; fi; done`,
           `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop 2>&1`,
           `rm -rf ${dumpDir}`,
         ].join(' && ');
 
-        const output = execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', script], {
-          encoding: 'utf-8',
-          timeout: 300000,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        let output = '';
+        try {
+          output = execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', script], {
+            encoding: 'utf-8',
+            timeout: 300000,
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+        } catch (execErr: any) {
+          // execFileSync throws on non-zero exit, but output is in stdout
+          output = execErr.stdout || execErr.stderr || execErr.message || '';
+          console.error('[Migration] exec error:', output.substring(0, 1000));
+        }
+
+        console.log('[Migration] Full output:', output.substring(0, 2000));
 
         if (output.includes('0 document(s) restored successfully') || output.includes('no target database was specified')) {
-          throw new Error('Migration completed but 0 documents were restored. Check source connection.');
+          throw new Error(`Migration completed but 0 documents were restored. Output: ${output.substring(0, 500)}`);
         }
       } else if (type === 'postgresql') {
         // PostgreSQL: pg_dump + pg_restore — all in a single kubectl exec
