@@ -259,6 +259,86 @@ export async function databaseRoutes(app: FastifyInstance) {
     }
   });
 
+  // Health check for a database instance
+  app.get<{ Params: { namespace: string; type: string; name: string } }>('/api/databases/:namespace/:type/:name/health', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Check database health status',
+      params: {
+        type: 'object',
+        properties: {
+          namespace: { type: 'string' },
+          type: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['namespace', 'type', 'name'],
+      },
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { namespace, type, name } = request.params;
+
+    const project = user.role === 'admin'
+      ? await prisma.project.findFirst({ where: { k8sNamespace: namespace } })
+      : await prisma.project.findFirst({ where: { k8sNamespace: namespace, userId: user.id } });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project namespace not found' });
+    }
+
+    try {
+      const pods = await k8s.k8sCoreApi.listNamespacedPod({
+        namespace,
+        labelSelector: `cnpg.io/cluster=${name}`,
+      });
+
+      if (!pods.items || pods.items.length === 0) {
+        // Try simple StatefulSet label (MongoDB, Redis, etc.)
+        const simplePods = await k8s.k8sCoreApi.listNamespacedPod({
+          namespace,
+          labelSelector: `app=${name}`,
+        });
+        if (!simplePods.items || simplePods.items.length === 0) {
+          return { status: 'unknown', pods: [], ready: 0, total: 0 };
+        }
+        const podStatuses = simplePods.items.map(p => ({
+          name: p.metadata?.name || '',
+          status: p.status?.phase || 'Unknown',
+          ready: p.status?.conditions?.find(c => c.type === 'Ready')?.status === 'True',
+          restarts: p.status?.containerStatuses?.[0]?.restartCount || 0,
+          age: p.metadata?.creationTimestamp || '',
+        }));
+        const readyCount = podStatuses.filter(p => p.ready).length;
+        return {
+          status: readyCount > 0 ? 'healthy' : 'unhealthy',
+          pods: podStatuses,
+          ready: readyCount,
+          total: podStatuses.length,
+        };
+      }
+
+      const podStatuses = pods.items.map(p => ({
+        name: p.metadata?.name || '',
+        status: p.status?.phase || 'Unknown',
+        ready: p.status?.conditions?.find(c => c.type === 'Ready')?.status === 'True',
+        restarts: p.status?.containerStatuses?.[0]?.restartCount || 0,
+        role: p.metadata?.labels?.['cnpg.io/role'] || '',
+        age: p.metadata?.creationTimestamp || '',
+      }));
+
+      const readyCount = podStatuses.filter(p => p.ready).length;
+      return {
+        status: readyCount > 0 ? 'healthy' : 'unhealthy',
+        pods: podStatuses,
+        ready: readyCount,
+        total: podStatuses.length,
+      };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
   // Delete a database instance
   app.delete<{ Params: { namespace: string; type: string; name: string } }>('/api/databases/:namespace/:type/:name', {
     schema: {
@@ -496,6 +576,7 @@ async function createPostgresInstance(namespace: string, name: string, resources
       },
       storage: {
         size: resources.storage,
+        storageClassName: 'local-path',
       },
       resources: {
         requests: {

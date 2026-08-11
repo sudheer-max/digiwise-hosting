@@ -338,6 +338,10 @@ class ApiClient {
     return this.request(`/databases/${namespace}/${type}/${name}/variables`);
   }
 
+  getDatabaseHealth(namespace: string, type: string, name: string) {
+    return this.request(`/databases/${namespace}/${type}/${name}/health`);
+  }
+
   migrateDatabase(namespace: string, type: string, name: string, sourceUri: string) {
     return this.request(`/databases/${namespace}/${type}/${name}/migrate`, {
       method: 'POST',

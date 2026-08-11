@@ -59,6 +59,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const info = DB_INFO[type] || DB_INFO.postgresql;
   const [db, setDb] = useState<any>(null);
   const [vars, setVars] = useState<any>(null);
+  const [health, setHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('variables');
@@ -76,13 +77,15 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const load = useCallback(async () => {
     setError('');
     try {
-      const [dbs, variables] = await Promise.all([
+      const [dbs, variables, healthData] = await Promise.all([
         api.listDatabases(namespace),
         api.getDatabaseVariables(namespace, type, dbName).catch(() => null),
+        api.getDatabaseHealth(namespace, type, dbName).catch(() => null),
       ]);
       const found = Array.isArray(dbs) ? dbs.find((d: any) => d.name === dbName && d.type === type) : null;
       setDb(found);
       setVars(variables);
+      setHealth(healthData);
     } catch (err: any) {
       setError(err.message || 'Failed to load database');
     } finally {
@@ -91,6 +94,13 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   }, [type, namespace, dbName]);
 
   useEffect(() => { setLoading(true); load(); }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.getDatabaseHealth(namespace, type, dbName).then(setHealth).catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [namespace, type, dbName]);
 
   const doDelete = async () => {
     setShowDeleteConfirm(true);
@@ -212,10 +222,25 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
 
       {/* Status banner */}
       <div className="bg-white border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span><StatusPill status={st} /></div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
+          <StatusPill status={health?.status === 'healthy' ? 'RUNNING' : health?.status === 'unhealthy' ? 'ERROR' : st} />
+        </div>
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Engine</span><span className="text-xs font-mono text-slate-700">{info.label}</span></div>
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Host</span><span className="text-xs font-mono text-slate-700">{host}</span></div>
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Port</span><span className="text-xs font-mono text-slate-700">{port}</span></div>
+        {health && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pods</span>
+            <span className={`text-xs font-mono font-bold ${health.ready === health.total ? 'text-emerald-600' : 'text-amber-600'}`}>{health.ready}/{health.total} ready</span>
+          </div>
+        )}
+        {publicHost && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Public</span>
+            <span className="text-xs font-mono text-slate-700">{publicHost}:{publicPort}</span>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
