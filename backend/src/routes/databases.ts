@@ -388,15 +388,20 @@ export async function databaseRoutes(app: FastifyInstance) {
       const podName = `${name}-1`;
 
       if (type === 'postgresql') {
-        // List tables
-        const listCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -c "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"`;
+        // Use kubectl exec but force TCP connection with -h flag to avoid peer auth
+        const pgHost = `${name}-rw.${namespace}.svc.cluster.local`;
+        const pgPort = '5432';
+        const pgUser = vars.username;
+        const pgPass = vars.password;
+        const pgDb = vars.databaseName;
+
+        const listCmd = `kubectl exec -n ${namespace} ${podName} -- env PGPASSWORD="${pgPass}" psql -h ${pgHost} -p ${pgPort} -U ${pgUser} -d ${pgDb} -t -A -c "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"`;
         const tableList = execSync(listCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
 
         if (table) {
-          // Fetch rows from specific table
-          const dataCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -F '|' -c "SELECT * FROM ${table} LIMIT ${limit}"`;
-          const colCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -c "SELECT column_name FROM information_schema.columns WHERE table_name='${table}' AND table_schema='public' ORDER BY ordinal_position"`;
-          const countCmd = `kubectl exec -n ${namespace} ${podName} -- psql -U ${vars.username} -d ${vars.databaseName} -t -A -c "SELECT count(*) FROM ${table}"`;
+          const dataCmd = `kubectl exec -n ${namespace} ${podName} -- env PGPASSWORD="${pgPass}" psql -h ${pgHost} -p ${pgPort} -U ${pgUser} -d ${pgDb} -t -A -F '|' -c "SELECT * FROM \\"${table}\\" LIMIT ${limit}"`;
+          const colCmd = `kubectl exec -n ${namespace} ${podName} -- env PGPASSWORD="${pgPass}" psql -h ${pgHost} -p ${pgPort} -U ${pgUser} -d ${pgDb} -t -A -c "SELECT column_name FROM information_schema.columns WHERE table_name='${table}' AND table_schema='public' ORDER BY ordinal_position"`;
+          const countCmd = `kubectl exec -n ${namespace} ${podName} -- env PGPASSWORD="${pgPass}" psql -h ${pgHost} -p ${pgPort} -U ${pgUser} -d ${pgDb} -t -A -c "SELECT count(*) FROM \\"${table}\\""`;
 
           const columns = execSync(colCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
           const rows = execSync(dataCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
