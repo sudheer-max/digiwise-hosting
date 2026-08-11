@@ -699,41 +699,39 @@ export async function databaseRoutes(app: FastifyInstance) {
         const sourceDbMatch = sourceUri.match(/\/([^/?]+)(\?|$)/);
         const sourceDbName = sourceDbMatch ? sourceDbMatch[1] : 'dump';
 
-        // Step 1: Dump from source
-        const dumpScript = `mkdir -p ${dumpDir} && mongodump --uri="${sourceUri}" --out=${dumpDir} --gzip`;
-        const dumpArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript];
-        execSync(`kubectl ${dumpArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
+        // Write script as base64 to avoid all shell quoting issues
+        const migrationScript = [
+          '#!/bin/bash',
+          'set -e',
+          `mkdir -p ${dumpDir}`,
+          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`,
+          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsFrom='${sourceDbName}.*' --nsTo='${vars.databaseName}.*'`,
+          `rm -rf ${dumpDir}`,
+          'echo MIGRATION_COMPLETE',
+        ].join('\n');
+        const scriptB64 = Buffer.from(migrationScript).toString('base64');
 
-        // Step 2: Restore to target — map source DB name to target DB name
-        const restoreScript = `mongorestore --uri="${targetUri}" --dir=${dumpDir} --gzip --drop --nsFrom="${sourceDbName}.*" --nsTo="${vars.databaseName}.*"`;
-        const restoreArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript];
-        execSync(`kubectl ${restoreArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
+        const runCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "echo '${scriptB64}' | base64 -d | bash"`;
+        execSync(runCmd, { encoding: 'utf-8', stdio: 'pipe', timeout: 300000 });
 
         // Step 3: Cleanup
-        const cleanupScript = `rm -rf ${dumpDir}`;
-        const cleanupArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', cleanupScript];
-        execSync(`kubectl ${cleanupArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 30000, encoding: 'utf-8', stdio: 'pipe' });
       } else if (type === 'postgresql') {
-        // PostgreSQL: pg_dump + pg_restore
+        // PostgreSQL: pg_dump + pg_restore — use base64 script to avoid shell quoting issues
         const dumpFile = `${dumpDir}/dump.sql`;
 
-        const dumpScript = `mkdir -p ${dumpDir} && pg_dump "${sourceUri}" > ${dumpFile}`;
-        const dumpArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript];
-        execSync(`kubectl ${dumpArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
+        const pgScript = [
+          '#!/bin/bash',
+          'set -e',
+          `mkdir -p ${dumpDir}`,
+          `pg_dump "${sourceUri}" > ${dumpFile}`,
+          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile}`,
+          `rm -rf ${dumpDir}`,
+          'echo MIGRATION_COMPLETE',
+        ].join('\n');
+        const pgScriptB64 = Buffer.from(pgScript).toString('base64');
 
-        const targetHost = vars.host;
-        const targetPort = vars.port;
-        const targetUser = vars.username;
-        const targetPass = vars.password;
-        const targetDb = vars.databaseName;
-
-        const restoreScript = `PGPASSWORD="${targetPass}" pg_restore -h ${targetHost} -p ${targetPort} -U ${targetUser} -d ${targetDb} --clean --if-exists < ${dumpFile}`;
-        const restoreArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript];
-        execSync(`kubectl ${restoreArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
-
-        const cleanupScript = `rm -rf ${dumpDir}`;
-        const cleanupArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', cleanupScript];
-        execSync(`kubectl ${cleanupArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 30000, encoding: 'utf-8', stdio: 'pipe' });
+        const runCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "echo '${pgScriptB64}' | base64 -d | bash"`;
+        execSync(runCmd, { encoding: 'utf-8', stdio: 'pipe', timeout: 300000 });
       }
 
       return reply.status(200).send({
