@@ -721,7 +721,7 @@ export async function databaseRoutes(app: FastifyInstance) {
         console.log('[Migration] Full output:', output.substring(0, 2000));
 
         if (output.includes('0 document(s) restored successfully') || output.includes('no target database was specified')) {
-          throw new Error(`Migration completed but 0 documents were restored. Output: ${output.substring(0, 500)}`);
+          throw new Error(`Migration completed but 0 documents were restored. Full output:\n${output}`);
         }
       } else if (type === 'postgresql') {
         // PostgreSQL: pg_dump + pg_restore — all in a single kubectl exec
