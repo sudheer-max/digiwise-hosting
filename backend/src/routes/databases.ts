@@ -1,7 +1,7 @@
 ﻿import { FastifyInstance } from 'fastify';
 import { prisma } from '../db/client.js';
 import * as k8s from '../services/kubernetes.js';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -695,58 +695,49 @@ export async function databaseRoutes(app: FastifyInstance) {
         // MongoDB: mongodump + mongorestore via kubectl exec
         const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
-        // Extract source DB name from URI for namespace mapping
-        const sourceDbMatch = sourceUri.match(/\/([^/?]+)(\?|$)/);
-        const sourceDbName = sourceDbMatch ? sourceDbMatch[1] : 'dump';
+        // Use spawn to avoid all shell quoting issues
+        const runKubectl = (args: string[], timeout = 300000): string => {
+          return new Promise<string>((resolve, reject) => {
+            const proc = spawn('kubectl', args, { timeout });
+            let stdout = '';
+            let stderr = '';
+            proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+            proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+            proc.on('close', (code) => {
+              if (code !== 0) reject(new Error(stderr || stdout));
+              else resolve(stdout);
+            });
+            proc.on('error', reject);
+          });
+        } as any;
 
-        // Write script as base64 to avoid all shell quoting issues
-        const migrationScript = [
-          '#!/bin/bash',
-          `mkdir -p ${dumpDir}`,
-          `echo "=== Starting mongodump ==="`,
-          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`,
-          `DUMP_STATUS=$?`,
-          `echo "=== Dump status: $DUMP_STATUS ==="`,
-          `ls -la ${dumpDir}/ 2>&1 || true`,
-          `echo "=== Renaming dump directories to target database ==="`,
-          `for dir in ${dumpDir}/*/; do`,
-          `  dirname=$(basename "$dir")`,
-          `  if [ "$dirname" != "admin" ] && [ "$dirname" != "config" ] && [ "$dirname" != "local" ] && [ "$dirname" != "${vars.databaseName}" ]; then`,
-          `    mv "$dir" "${dumpDir}/${vars.databaseName}" 2>/dev/null || true`,
-          `  fi`,
-          `done`,
-          `echo "=== Final dump structure ==="`,
-          `ls -la ${dumpDir}/ 2>&1 || true`,
-          `echo "=== Starting mongorestore ==="`,
-          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsExclude='admin' --nsExclude='config' --nsExclude='local'; RESTORE_EXIT=$?`,
-          `echo "=== Restore exit: $RESTORE_EXIT ==="`,
-          `echo "=== Cleanup ==="`,
-          `rm -rf ${dumpDir}`,
-          `if [ $DUMP_STATUS -ne 0 ]; then echo "MIGRATION_FAILED: dump failed"; exit 1; fi`,
-          'echo MIGRATION_COMPLETE',
-        ].join('\n');
-        const scriptB64 = Buffer.from(migrationScript).toString('base64');
+        // Step 1: mongodump
+        const dumpScript = `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip && ls -la ${dumpDir}/`;
+        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript]);
 
-        const runCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "echo '${scriptB64}' | base64 -d | bash"`;
-        execSync(runCmd, { encoding: 'utf-8', stdio: 'pipe', timeout: 300000 });
+        // Step 2: Rename source DB dirs to target DB name
+        const renameScript = `cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "admin" ] && [ "$n" != "config" ] && [ "$n" != "local" ]; then mv "$n" ${vars.databaseName}; break; fi; done && ls -la ${dumpDir}/`;
+        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', renameScript]);
+
+        // Step 3: mongorestore
+        const restoreScript = `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsExclude='admin.*' --nsExclude='config.*' --nsExclude='local.*' 2>&1; echo "RESTORE_DONE:$?"`;
+        const restoreOutput = await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript]);
+
+        // Step 4: Cleanup
+        await runKubectl(['exec', '-n', namespace, podName, '--', 'rm', '-rf', dumpDir]).catch(() => {});
+
+        if (restoreOutput.includes('MIGRATION_FAILED') || restoreOutput.includes('0 document(s) restored')) {
+          throw new Error(`Migration restore failed: ${restoreOutput.slice(-500)}`);
+        }
 
         // Step 3: Cleanup
       } else if (type === 'postgresql') {
-        // PostgreSQL: pg_dump + pg_restore — use base64 script to avoid shell quoting issues
+        // PostgreSQL: pg_dump + pg_restore via spawn
         const dumpFile = `${dumpDir}/dump.sql`;
 
-        const pgScript = [
-          '#!/bin/bash',
-          `mkdir -p ${dumpDir}`,
-          `pg_dump "${sourceUri}" > ${dumpFile} || true`,
-          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile} || true`,
-          `rm -rf ${dumpDir}`,
-          'echo MIGRATION_COMPLETE',
-        ].join('\n');
-        const pgScriptB64 = Buffer.from(pgScript).toString('base64');
-
-        const runCmd = `kubectl exec -n ${namespace} ${podName} -- bash -c "echo '${pgScriptB64}' | base64 -d | bash"`;
-        execSync(runCmd, { encoding: 'utf-8', stdio: 'pipe', timeout: 300000 });
+        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', `mkdir -p ${dumpDir} && pg_dump '${sourceUri}' > ${dumpFile} 2>&1`]);
+        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile} 2>&1`]);
+        await runKubectl(['exec', '-n', namespace, podName, '--', 'rm', '-rf', dumpDir]).catch(() => {});
       }
 
       return reply.status(200).send({
