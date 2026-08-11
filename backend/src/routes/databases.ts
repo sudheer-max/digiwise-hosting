@@ -98,7 +98,7 @@ export async function databaseRoutes(app: FastifyInstance) {
             spec: {
               type: 'NodePort',
               selector: type === 'postgresql'
-                ? { ['cnpg.io/cluster']: name, role: 'rw' }
+                ? { ['cnpg.io/cluster']: name, role: 'primary' }
                 : { app: name },
               ports: [{ port, targetPort: port, nodePort: 30100 + Math.floor(Math.random() * 2600) }],
             },
