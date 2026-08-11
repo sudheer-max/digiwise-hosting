@@ -692,49 +692,41 @@ export async function databaseRoutes(app: FastifyInstance) {
       const dumpDir = `/tmp/migration-${Date.now()}`;
 
       if (type === 'mongodb') {
-        // MongoDB: mongodump + mongorestore via kubectl exec
+        // MongoDB: mongodump + mongorestore — ALL steps in a single kubectl exec
+        // Separate exec calls fail silently, so chain everything in one bash -c
         const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
-        // Helper: run kubectl exec command without shell (no quoting issues)
-        const kexec = (cmd: string[]) => {
-          return execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', cmd.join(' && ')], {
-            encoding: 'utf-8',
-            timeout: 300000,
-            stdio: ['pipe', 'pipe', 'pipe'],
-          });
-        };
+        const script = [
+          `rm -rf ${dumpDir}`,
+          `mkdir -p ${dumpDir}`,
+          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`,
+          `rm -rf ${dumpDir}/admin ${dumpDir}/config ${dumpDir}/local`,
+          `cd ${dumpDir} && for d in */; do n=\\$(basename "\\$d"); if [ "\\$n" != "${vars.databaseName}" ]; then mv "\\$n" ${vars.databaseName}; break; fi; done`,
+          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop`,
+          `rm -rf ${dumpDir}`,
+        ].join(' && ');
 
-        // Step 1: mongodump — dump all databases
-        const dumpResult = kexec([`mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`]);
+        const output = execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', script], {
+          encoding: 'utf-8',
+          timeout: 300000,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
 
-        // Step 2: Delete admin/config/local dirs (restore would overwrite auth users)
-        kexec([`rm -rf ${dumpDir}/admin ${dumpDir}/config ${dumpDir}/local`]);
-
-        // Step 3: Rename source DB dirs to target DB name
-        kexec([`cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "${vars.databaseName}" ]; then mv "$n" ${vars.databaseName}; break; fi; done`]);
-
-        // Step 4: mongorestore into target
-        const restoreResult = kexec([`mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop`]);
-
-        // Step 4: Cleanup
-        try { kexec([`rm -rf ${dumpDir}`]); } catch { /* ignore */ }
-
-        // Verify something was restored
-        if (restoreResult.includes('0 document(s) restored')) {
+        if (output.includes('0 document(s) restored')) {
           throw new Error('Migration completed but 0 documents were restored. Check source connection.');
         }
-
-        // Step 3: Cleanup
       } else if (type === 'postgresql') {
-        // PostgreSQL: pg_dump + pg_restore via kubectl exec
+        // PostgreSQL: pg_dump + pg_restore — all in a single kubectl exec
         const dumpFile = `${dumpDir}/dump.sql`;
-        const pgKexec = (cmd: string[]) => {
-          return execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', cmd.join(' && ')], {
-            encoding: 'utf-8', timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'],
-          });
-        };
-        pgKexec([`mkdir -p ${dumpDir}`, `pg_dump '${sourceUri}' > ${dumpFile}`, `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile}`]);
-        try { pgKexec([`rm -rf ${dumpDir}`]); } catch { /* ignore */ }
+        const pgScript = [
+          `mkdir -p ${dumpDir}`,
+          `pg_dump '${sourceUri}' > ${dumpFile}`,
+          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile}`,
+          `rm -rf ${dumpDir}`,
+        ].join(' && ');
+        execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', pgScript], {
+          encoding: 'utf-8', timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'],
+        });
       }
 
       return reply.status(200).send({
