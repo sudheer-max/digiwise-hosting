@@ -1,6 +1,6 @@
 import { prisma } from '../db/client.js';
 import { listOwnedProjectIds } from './ownership.js';
-import { listDeployments, listPods } from './kubernetes.js';
+import { listDeployments, listStatefulSets, listPods } from './kubernetes.js';
 
 export interface PlanDefinition {
   key: string;
@@ -76,12 +76,28 @@ export async function listUserServices(userId: string): Promise<ServiceInfo[]> {
 
   for (const ns of namespaces) {
     try {
+      // Count Deployments as apps
       const deployments = await listDeployments(ns);
       for (const dep of deployments) {
         out.push({
           serviceId: `${ns}/${dep.name}`,
           name: dep.name,
           serviceType: 'app',
+          namespace: ns,
+        });
+      }
+    } catch {
+      // Namespace might not exist yet
+    }
+
+    try {
+      // Count StatefulSets as databases
+      const statefulSets = await listStatefulSets(ns);
+      for (const sts of statefulSets) {
+        out.push({
+          serviceId: `${ns}/${sts.name}`,
+          name: sts.name,
+          serviceType: 'database',
           namespace: ns,
         });
       }

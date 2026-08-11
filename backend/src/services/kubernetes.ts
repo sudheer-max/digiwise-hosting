@@ -25,6 +25,16 @@ export interface DeploymentInfo {
   createdAt?: string | Date;
 }
 
+export interface StatefulSetInfo {
+  name: string;
+  namespace: string;
+  status: string;
+  replicas: number;
+  readyReplicas: number;
+  image: string;
+  createdAt?: string | Date;
+}
+
 export interface ServiceInfo {
   name: string;
   namespace: string;
@@ -175,6 +185,19 @@ export async function listDeployments(namespace: string): Promise<DeploymentInfo
     readyReplicas: dep.status?.readyReplicas || 0,
     image: dep.spec?.template?.spec?.containers?.[0]?.image || '',
     createdAt: dep.metadata?.creationTimestamp,
+  }));
+}
+
+export async function listStatefulSets(namespace: string): Promise<StatefulSetInfo[]> {
+  const result = await appsApi.listNamespacedStatefulSet({ namespace });
+  return (result.items || []).map((sts) => ({
+    name: sts.metadata?.name || '',
+    namespace,
+    status: sts.status?.readyReplicas === sts.spec?.replicas ? 'Running' : 'Pending',
+    replicas: sts.spec?.replicas || 0,
+    readyReplicas: sts.status?.readyReplicas || 0,
+    image: sts.spec?.template?.spec?.containers?.[0]?.image || '',
+    createdAt: sts.metadata?.creationTimestamp,
   }));
 }
 

@@ -258,6 +258,12 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
           <StatusPill status={health?.status === 'healthy' ? 'RUNNING' : health?.status === 'unhealthy' ? 'ERROR' : st} />
         </div>
+        {health && health.status === 'unhealthy' && health.pods && health.pods.length > 0 && (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reason</span>
+            <span className="text-xs text-red-600 font-mono truncate">{health.pods[0].reason || health.pods[0].message || 'Pod not ready'}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Engine</span><span className="text-xs font-mono text-slate-700">{info.label}</span></div>
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Host</span><span className="text-xs font-mono text-slate-700">{host}</span></div>
         <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Port</span><span className="text-xs font-mono text-slate-700">{port}</span></div>
@@ -596,7 +602,23 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
             <h3 className="text-sm font-bold text-slate-900">Service Logs</h3>
             <GhostButton onClick={openLogs}><Terminal className="w-3.5 h-3.5" /> View logs</GhostButton>
           </div>
-          <p className="text-xs text-slate-400">Database logs are accessed via the platform. Click "View logs" to see the command.</p>
+          {health && health.events && health.events.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Pod Events</p>
+              <div className="max-h-64 overflow-y-auto border border-slate-200 bg-slate-50 p-3 space-y-1">
+                {health.events.map((ev: any, i: number) => (
+                  <div key={i} className={`text-[11px] font-mono flex items-start gap-2 ${ev.type === 'Warning' ? 'text-amber-700' : 'text-slate-600'}`}>
+                    <span className="shrink-0 w-16 text-slate-400">{ev.lastSeen ? new Date(ev.lastSeen).toLocaleTimeString() : ''}</span>
+                    <span className="shrink-0 font-bold">{ev.reason}</span>
+                    <span className="break-all">{ev.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {(!health?.events || health.events.length === 0) && (
+            <p className="text-xs text-slate-400">Click "View logs" to fetch pod logs.</p>
+          )}
         </div>
       )}
 

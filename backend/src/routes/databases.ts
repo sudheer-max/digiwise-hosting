@@ -323,7 +323,7 @@ export async function databaseRoutes(app: FastifyInstance) {
           labelSelector: `app=${name}`,
         });
         if (!simplePods.items || simplePods.items.length === 0) {
-          return { status: 'unknown', pods: [], ready: 0, total: 0 };
+          return { status: 'unknown', pods: [], ready: 0, total: 0, events: [] };
         }
         const podStatuses = simplePods.items.map(p => ({
           name: p.metadata?.name || '',
@@ -331,13 +331,41 @@ export async function databaseRoutes(app: FastifyInstance) {
           ready: p.status?.conditions?.find(c => c.type === 'Ready')?.status === 'True',
           restarts: p.status?.containerStatuses?.[0]?.restartCount || 0,
           age: p.metadata?.creationTimestamp || '',
+          reason: p.status?.conditions?.find(c => c.type === 'Ready')?.reason || '',
+          message: p.status?.conditions?.find(c => c.type === 'Ready')?.message || '',
         }));
         const readyCount = podStatuses.filter(p => p.ready).length;
+
+        // Get pod events for error details
+        let events: any[] = [];
+        for (const p of simplePods.items) {
+          try {
+            const evts = await k8s.k8sCoreApi.listNamespacedEvent({
+              namespace,
+              fieldSelector: `involvedObject.name=${p.metadata?.name}`,
+            });
+            events.push(...(evts.items || []));
+          } catch { /* ignore */ }
+        }
+        // Sort events by last timestamp, most recent first
+        events.sort((a: any, b: any) => {
+          const ta = a.lastTimestamp?.getTime?.() || a.metadata?.creationTimestamp?.getTime?.() || 0;
+          const tb = b.lastTimestamp?.getTime?.() || b.metadata?.creationTimestamp?.getTime?.() || 0;
+          return tb - ta;
+        });
+        events = events.slice(0, 20); // Limit to 20 recent events
+
         return {
           status: readyCount > 0 ? 'healthy' : 'unhealthy',
           pods: podStatuses,
           ready: readyCount,
           total: podStatuses.length,
+          events: events.map(e => ({
+            type: e.type || '',
+            reason: e.reason || '',
+            message: e.message || '',
+            lastSeen: e.lastTimestamp || e.metadata?.creationTimestamp || '',
+          })),
         };
       }
 
@@ -348,14 +376,41 @@ export async function databaseRoutes(app: FastifyInstance) {
         restarts: p.status?.containerStatuses?.[0]?.restartCount || 0,
         role: p.metadata?.labels?.['cnpg.io/role'] || '',
         age: p.metadata?.creationTimestamp || '',
+        reason: p.status?.conditions?.find(c => c.type === 'Ready')?.reason || '',
+        message: p.status?.conditions?.find(c => c.type === 'Ready')?.message || '',
       }));
 
       const readyCount = podStatuses.filter(p => p.ready).length;
+
+      // Get pod events for error details
+      let events: any[] = [];
+      for (const p of pods.items) {
+        try {
+          const evts = await k8s.k8sCoreApi.listNamespacedEvent({
+            namespace,
+            fieldSelector: `involvedObject.name=${p.metadata?.name}`,
+          });
+          events.push(...(evts.items || []));
+        } catch { /* ignore */ }
+      }
+      events.sort((a: any, b: any) => {
+        const ta = a.lastTimestamp?.getTime?.() || a.metadata?.creationTimestamp?.getTime?.() || 0;
+        const tb = b.lastTimestamp?.getTime?.() || b.metadata?.creationTimestamp?.getTime?.() || 0;
+        return tb - ta;
+      });
+      events = events.slice(0, 20);
+
       return {
         status: readyCount > 0 ? 'healthy' : 'unhealthy',
         pods: podStatuses,
         ready: readyCount,
         total: podStatuses.length,
+        events: events.map(e => ({
+          type: e.type || '',
+          reason: e.reason || '',
+          message: e.message || '',
+          lastSeen: e.lastTimestamp || e.metadata?.creationTimestamp || '',
+        })),
       };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
