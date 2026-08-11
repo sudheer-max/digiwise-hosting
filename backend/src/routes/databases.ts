@@ -701,8 +701,8 @@ export async function databaseRoutes(app: FastifyInstance) {
           `mkdir -p ${dumpDir}`,
           `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`,
           `rm -rf ${dumpDir}/admin ${dumpDir}/config ${dumpDir}/local`,
-          `cd ${dumpDir} && for d in */; do n=\\$(basename "\\$d"); if [ "\\$n" != "${vars.databaseName}" ]; then mv "\\$n" ${vars.databaseName}; break; fi; done`,
-          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop`,
+          `cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "${vars.databaseName}" ]; then mv "$n" ${vars.databaseName}; break; fi; done`,
+          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop 2>&1`,
           `rm -rf ${dumpDir}`,
         ].join(' && ');
 
