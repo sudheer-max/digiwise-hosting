@@ -71,7 +71,18 @@ function monthKey(d: Date): string {
 }
 
 export async function listUserServices(userId: string): Promise<ServiceInfo[]> {
-  const namespaces = await listOwnedProjectIds(userId);
+  // For admin users, count all projects; for regular users, only their own
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const isAdmin = user?.role === 'admin';
+
+  let namespaces: string[];
+  if (isAdmin) {
+    const allProjects = await prisma.project.findMany({ select: { k8sNamespace: true } });
+    namespaces = allProjects.map((r) => r.k8sNamespace);
+  } else {
+    namespaces = await listOwnedProjectIds(userId);
+  }
+
   const out: ServiceInfo[] = [];
 
   for (const ns of namespaces) {
