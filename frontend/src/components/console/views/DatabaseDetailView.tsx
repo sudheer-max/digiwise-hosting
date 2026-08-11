@@ -105,6 +105,12 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     return () => clearInterval(interval);
   }, [namespace, type, dbName]);
 
+  useEffect(() => {
+    if (tab === 'browse' && !browseData && !browseLoading) {
+      loadBrowse();
+    }
+  }, [tab]);
+
   const doDelete = async () => {
     setShowDeleteConfirm(true);
   };
