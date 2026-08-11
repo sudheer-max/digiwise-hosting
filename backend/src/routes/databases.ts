@@ -385,7 +385,21 @@ export async function databaseRoutes(app: FastifyInstance) {
 
     try {
       const vars = await getDatabaseVariables(namespace, type, name);
-      const podName = `${name}-1`;
+
+      // Find running pod dynamically (CNPG starts at 1, StatefulSets at 0)
+      let podName = '';
+      try {
+        const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({ namespace });
+        const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
+        const running = items.find((p: any) =>
+          p.status?.phase === 'Running' && p.metadata?.name?.startsWith(`${name}-`)
+        );
+        podName = running?.metadata?.name || '';
+      } catch { /* continue */ }
+
+      if (!podName) {
+        return reply.status(404).send({ error: 'No running pod found for database' });
+      }
 
       if (type === 'postgresql') {
         // Use kubectl exec but force TCP connection with -h flag to avoid peer auth
