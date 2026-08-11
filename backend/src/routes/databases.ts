@@ -713,15 +713,12 @@ export async function databaseRoutes(app: FastifyInstance) {
             stdio: ['pipe', 'pipe', 'pipe'],
           });
         } catch (execErr: any) {
-          // execFileSync throws on non-zero exit, but output is in stdout
           output = execErr.stdout || execErr.stderr || execErr.message || '';
-          console.error('[Migration] exec error:', output.substring(0, 1000));
+          throw new Error(`Migration failed: ${output.substring(0, 1000)}`);
         }
 
-        console.log('[Migration] Full output:', output.substring(0, 2000));
-
         if (output.includes('0 document(s) restored successfully') || output.includes('no target database was specified')) {
-          throw new Error(`Migration completed but 0 documents were restored. Full output:\n${output}`);
+          throw new Error('Migration completed but 0 documents were restored. Check source connection.');
         }
       } else if (type === 'postgresql') {
         // PostgreSQL: pg_dump + pg_restore — all in a single kubectl exec
