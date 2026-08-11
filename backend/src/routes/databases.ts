@@ -418,14 +418,21 @@ export async function databaseRoutes(app: FastifyInstance) {
           const countCmd = `kubectl exec -n ${namespace} ${podName} -- env PGPASSWORD="${pgPass}" psql -h ${pgHost} -p ${pgPort} -U ${pgUser} -d ${pgDb} -t -A -c "SELECT count(*) FROM \\"${table}\\""`;
 
           const columns = execSync(colCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
-          const rows = execSync(dataCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
+          const rawRows = execSync(dataCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim().split('\n').filter(Boolean);
           const total = parseInt(execSync(countCmd, { encoding: 'utf-8', stdio: 'pipe' }).trim(), 10);
+
+          const rows = rawRows.map(r => {
+            const vals = r.split('|');
+            const obj: Record<string, string> = {};
+            columns.forEach((col, i) => { obj[col] = vals[i] ?? ''; });
+            return obj;
+          });
 
           return {
             tables: tableList,
             selectedTable: table,
             columns,
-            rows: rows.map(r => r.split('|')),
+            rows,
             total,
             limit,
           };

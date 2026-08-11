@@ -528,28 +528,32 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
 
                 {/* Data table */}
                 {browseData?.selectedTable && browseData?.columns?.length > 0 ? (
-                  <div className="overflow-auto max-h-[60vh] border border-slate-200">
+                  <div className="overflow-auto max-h-[60vh] border border-slate-200 rounded">
                     <table className="w-full text-left border-collapse">
-                      <thead className="sticky top-0 bg-slate-50">
-                        <tr className="border-b border-slate-200">
+                      <thead className="sticky top-0 bg-slate-50 z-10">
+                        <tr className="border-b-2 border-slate-300">
                           {browseData.columns.map((col: string) => (
-                            <th key={col} className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{col}</th>
+                            <th key={col} className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap bg-slate-50 border-r border-slate-200 last:border-r-0">{col}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {browseData.rows.map((row: any, idx: number) => (
-                          <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50">
-                            {browseData.columns.map((col: string) => (
-                              <td key={col} className="px-3 py-2 text-xs font-mono text-slate-700 max-w-[300px] truncate">
-                                {typeof row === 'object' ? String(row[col] ?? '') : String(row)}
-                              </td>
-                            ))}
+                          <tr key={idx} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors">
+                            {browseData.columns.map((col: string) => {
+                              const val = typeof row === 'object' && row !== null ? (row[col] ?? '') : String(row ?? '');
+                              const display = val === null || val === undefined ? '' : String(val);
+                              return (
+                                <td key={col} className="px-3 py-2 text-xs font-mono text-slate-700 max-w-[300px] truncate border-r border-slate-100 last:border-r-0" title={display}>
+                                  {display || <span className="text-slate-300 italic">null</span>}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    <div className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-200">
+                    <div className="px-3 py-2 text-[10px] text-slate-400 border-t border-slate-200 bg-slate-50/50">
                       Showing {browseData.rows.length} of {browseData.total} rows
                     </div>
                   </div>
