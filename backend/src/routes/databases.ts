@@ -597,7 +597,9 @@ async function createPostgresInstance(namespace: string, name: string, resources
       },
       storage: {
         size: resources.storage,
-        storageClass: 'local-path',
+        pvcTemplate: {
+          storageClassName: 'local-path',
+        },
       },
       resources: {
         requests: {
