@@ -1,7 +1,7 @@
 ﻿import { FastifyInstance } from 'fastify';
 import { prisma } from '../db/client.js';
 import * as k8s from '../services/kubernetes.js';
-import { execSync, spawn } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -695,49 +695,43 @@ export async function databaseRoutes(app: FastifyInstance) {
         // MongoDB: mongodump + mongorestore via kubectl exec
         const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
-        // Use spawn to avoid all shell quoting issues
-        const runKubectl = (args: string[], timeout = 300000): string => {
-          return new Promise<string>((resolve, reject) => {
-            const proc = spawn('kubectl', args, { timeout });
-            let stdout = '';
-            let stderr = '';
-            proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
-            proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
-            proc.on('close', (code) => {
-              if (code !== 0) reject(new Error(stderr || stdout));
-              else resolve(stdout);
-            });
-            proc.on('error', reject);
+        // Helper: run kubectl exec command without shell (no quoting issues)
+        const kexec = (cmd: string[]) => {
+          return execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', cmd.join(' && ')], {
+            encoding: 'utf-8',
+            timeout: 300000,
+            stdio: ['pipe', 'pipe', 'pipe'],
           });
-        } as any;
+        };
 
-        // Step 1: mongodump
-        const dumpScript = `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip && ls -la ${dumpDir}/`;
-        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript]);
+        // Step 1: mongodump — dump all databases
+        const dumpResult = kexec([`mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`]);
 
-        // Step 2: Rename source DB dirs to target DB name
-        const renameScript = `cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "admin" ] && [ "$n" != "config" ] && [ "$n" != "local" ]; then mv "$n" ${vars.databaseName}; break; fi; done && ls -la ${dumpDir}/`;
-        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', renameScript]);
+        // Step 2: Rename source DB dirs to target DB name (skip admin/config/local)
+        kexec([`cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "admin" ] && [ "$n" != "config" ] && [ "$n" != "local" ]; then mv "$n" ${vars.databaseName}; break; fi; done`]);
 
-        // Step 3: mongorestore
-        const restoreScript = `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsExclude='admin.*' --nsExclude='config.*' --nsExclude='local.*' 2>&1; echo "RESTORE_DONE:$?"`;
-        const restoreOutput = await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript]);
+        // Step 3: mongorestore into target
+        const restoreResult = kexec([`mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsExclude='admin.*' --nsExclude='config.*' --nsExclude='local.*'`]);
 
         // Step 4: Cleanup
-        await runKubectl(['exec', '-n', namespace, podName, '--', 'rm', '-rf', dumpDir]).catch(() => {});
+        try { kexec([`rm -rf ${dumpDir}`]); } catch { /* ignore */ }
 
-        if (restoreOutput.includes('MIGRATION_FAILED') || restoreOutput.includes('0 document(s) restored')) {
-          throw new Error(`Migration restore failed: ${restoreOutput.slice(-500)}`);
+        // Verify something was restored
+        if (restoreResult.includes('0 document(s) restored')) {
+          throw new Error('Migration completed but 0 documents were restored. Check source connection.');
         }
 
         // Step 3: Cleanup
       } else if (type === 'postgresql') {
-        // PostgreSQL: pg_dump + pg_restore via spawn
+        // PostgreSQL: pg_dump + pg_restore via kubectl exec
         const dumpFile = `${dumpDir}/dump.sql`;
-
-        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', `mkdir -p ${dumpDir} && pg_dump '${sourceUri}' > ${dumpFile} 2>&1`]);
-        await runKubectl(['exec', '-n', namespace, podName, '--', 'bash', '-c', `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile} 2>&1`]);
-        await runKubectl(['exec', '-n', namespace, podName, '--', 'rm', '-rf', dumpDir]).catch(() => {});
+        const pgKexec = (cmd: string[]) => {
+          return execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', cmd.join(' && ')], {
+            encoding: 'utf-8', timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'],
+          });
+        };
+        pgKexec([`mkdir -p ${dumpDir}`, `pg_dump '${sourceUri}' > ${dumpFile}`, `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile}`]);
+        try { pgKexec([`rm -rf ${dumpDir}`]); } catch { /* ignore */ }
       }
 
       return reply.status(200).send({
