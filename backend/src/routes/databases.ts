@@ -707,11 +707,14 @@ export async function databaseRoutes(app: FastifyInstance) {
         // Step 1: mongodump — dump all databases
         const dumpResult = kexec([`mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`]);
 
-        // Step 2: Rename source DB dirs to target DB name (skip admin/config/local)
-        kexec([`cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "admin" ] && [ "$n" != "config" ] && [ "$n" != "local" ]; then mv "$n" ${vars.databaseName}; break; fi; done`]);
+        // Step 2: Delete admin/config/local dirs (restore would overwrite auth users)
+        kexec([`rm -rf ${dumpDir}/admin ${dumpDir}/config ${dumpDir}/local`]);
 
-        // Step 3: mongorestore into target
-        const restoreResult = kexec([`mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsExclude='admin.*' --nsExclude='config.*' --nsExclude='local.*'`]);
+        // Step 3: Rename source DB dirs to target DB name
+        kexec([`cd ${dumpDir} && for d in */; do n=$(basename "$d"); if [ "$n" != "${vars.databaseName}" ]; then mv "$n" ${vars.databaseName}; break; fi; done`]);
+
+        // Step 4: mongorestore into target
+        const restoreResult = kexec([`mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop`]);
 
         // Step 4: Cleanup
         try { kexec([`rm -rf ${dumpDir}`]); } catch { /* ignore */ }
