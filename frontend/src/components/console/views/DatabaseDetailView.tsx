@@ -185,6 +185,17 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     setBrowseLoading(false);
   };
 
+  const deleteRow = async (table: string, row: any) => {
+    const idCol = type === 'mongodb' ? '_id' : 'id';
+    const rowId = row[idCol];
+    if (!rowId) return;
+    if (!confirm(`Delete row where ${idCol} = ${rowId}?`)) return;
+    try {
+      await api.deleteDatabaseRow(namespace, type, dbName, table, String(rowId), idCol);
+      loadBrowse(table);
+    } catch { /* ignore */ }
+  };
+
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'variables', label: 'Variables', icon: <KeyRound className="w-3.5 h-3.5" /> },
     { id: 'connect', label: 'Connect', icon: <Plug className="w-3.5 h-3.5" /> },
@@ -535,11 +546,12 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
                           {browseData.columns.map((col: string) => (
                             <th key={col} className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap bg-slate-50 border-r border-slate-200 last:border-r-0">{col}</th>
                           ))}
+                          <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap bg-slate-50 w-10"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {browseData.rows.map((row: any, idx: number) => (
-                          <tr key={idx} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors">
+                          <tr key={idx} className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors group">
                             {browseData.columns.map((col: string) => {
                               const val = typeof row === 'object' && row !== null ? (row[col] ?? '') : String(row ?? '');
                               const display = val === null || val === undefined ? '' : String(val);
@@ -549,6 +561,15 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
                                 </td>
                               );
                             })}
+                            <td className="px-2 py-2 text-center">
+                              <button
+                                onClick={() => deleteRow(browseData.selectedTable, row)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                                title="Delete row"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

@@ -475,6 +475,62 @@ export async function databaseRoutes(app: FastifyInstance) {
     }
   });
 
+  // Delete a row from database table
+  app.delete<{ Params: { namespace: string; type: string; name: string }; Querystring: { table: string; id: string; idColumn?: string } }>('/api/databases/:namespace/:type/:name/row', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Delete a row from a database table',
+      params: { type: 'object', properties: { namespace: { type: 'string' }, type: { type: 'string' }, name: { type: 'string' } }, required: ['namespace', 'type', 'name'] },
+      querystring: { type: 'object', properties: { table: { type: 'string' }, id: { type: 'string' }, idColumn: { type: 'string' } }, required: ['table', 'id'] },
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { namespace, type, name } = request.params;
+    const { table, id, idColumn = 'id' } = request.query;
+
+    const project = user.role === 'admin'
+      ? await prisma.project.findFirst({ where: { k8sNamespace: namespace } })
+      : await prisma.project.findFirst({ where: { k8sNamespace: namespace, userId: user.id } });
+    if (!project) return reply.status(404).send({ error: 'Project namespace not found' });
+
+    if (!table || !id) return reply.status(400).send({ error: 'table and id query params required' });
+
+    try {
+      const vars = await getDatabaseVariables(namespace, type, name);
+
+      // Find running pod
+      let podName = '';
+      try {
+        const podsRes: any = await k8s.k8sCoreApi.listNamespacedPod({ namespace });
+        const items = podsRes.items || (podsRes.body && podsRes.body.items) || [];
+        const running = items.find((p: any) =>
+          p.status?.phase === 'Running' && p.metadata?.name?.startsWith(`${name}-`)
+        );
+        podName = running?.metadata?.name || '';
+      } catch { /* continue */ }
+
+      if (!podName) return reply.status(404).send({ error: 'Database pod not found' });
+
+      if (type === 'postgresql') {
+        const pgHost = `${name}-rw.${namespace}.svc.cluster.local`;
+        const cmd = `kubectl exec -n ${namespace} ${podName} -- env PGPASSWORD="${vars.password}" psql -h ${pgHost} -p 5432 -U ${vars.username} -d ${vars.databaseName} -t -A -c "DELETE FROM \\"${table}\\" WHERE \\"${idColumn}\\" = '${id.replace(/'/g, "''")}'"`;
+        execSync(cmd, { encoding: 'utf-8', stdio: 'pipe' });
+        return { success: true, message: `Row deleted from ${table}` };
+      }
+
+      if (type === 'mongodb') {
+        const cmd = `kubectl exec -n ${namespace} ${podName} -- mongosh -u ${vars.username} -p ${vars.password} --authenticationDatabase admin ${vars.databaseName} --eval "db.${table}.deleteOne({_id: ObjectId('${id}')})" --quiet`;
+        execSync(cmd, { encoding: 'utf-8', stdio: 'pipe' });
+        return { success: true, message: `Row deleted from ${table}` };
+      }
+
+      return reply.status(400).send({ error: 'Delete only supported for PostgreSQL and MongoDB' });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
   // Delete a database instance
   app.delete<{ Params: { namespace: string; type: string; name: string } }>('/api/databases/:namespace/:type/:name', {
     schema: {
@@ -639,13 +695,17 @@ export async function databaseRoutes(app: FastifyInstance) {
         // MongoDB: mongodump + mongorestore via kubectl exec
         const targetUri = `mongodb://${vars.username}:${vars.password}@${vars.host}:${vars.port}/${vars.databaseName}?authSource=admin`;
 
+        // Extract source DB name from URI for namespace mapping
+        const sourceDbMatch = sourceUri.match(/\/([^/?]+)(\?|$)/);
+        const sourceDbName = sourceDbMatch ? sourceDbMatch[1] : 'dump';
+
         // Step 1: Dump from source
         const dumpScript = `mkdir -p ${dumpDir} && mongodump --uri="${sourceUri}" --out=${dumpDir} --gzip`;
         const dumpArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript];
         execSync(`kubectl ${dumpArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
 
-        // Step 2: Restore to target
-        const restoreScript = `mongorestore --uri="${targetUri}" --dir=${dumpDir} --gzip --drop`;
+        // Step 2: Restore to target — map source DB name to target DB name
+        const restoreScript = `mongorestore --uri="${targetUri}" --dir=${dumpDir} --gzip --drop --nsFrom="${sourceDbName}.*" --nsTo="${vars.databaseName}.*"`;
         const restoreArgs = ['exec', '-n', namespace, podName, '--', 'bash', '-c', restoreScript];
         execSync(`kubectl ${restoreArgs.map(a => `"${a}"`).join(' ')}`, { timeout: 300000, encoding: 'utf-8', stdio: 'pipe' });
 

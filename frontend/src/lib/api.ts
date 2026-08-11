@@ -350,6 +350,12 @@ class ApiClient {
     return this.request(`/databases/${namespace}/${type}/${name}/browse${qs}`);
   }
 
+  deleteDatabaseRow(namespace: string, type: string, name: string, table: string, id: string, idColumn?: string) {
+    const params = new URLSearchParams({ table, id });
+    if (idColumn) params.set('idColumn', idColumn);
+    return this.request(`/databases/${namespace}/${type}/${name}/row?${params}`, { method: 'DELETE' });
+  }
+
   migrateDatabase(namespace: string, type: string, name: string, sourceUri: string) {
     return this.request(`/databases/${namespace}/${type}/${name}/migrate`, {
       method: 'POST',
