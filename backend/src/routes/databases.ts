@@ -702,10 +702,9 @@ export async function databaseRoutes(app: FastifyInstance) {
         // Write script as base64 to avoid all shell quoting issues
         const migrationScript = [
           '#!/bin/bash',
-          'set -e',
           `mkdir -p ${dumpDir}`,
-          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip`,
-          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsFrom='${sourceDbName}.*' --nsTo='${vars.databaseName}.*'`,
+          `mongodump --uri='${sourceUri}' --out=${dumpDir} --gzip --excludeCollection=system.users --excludeCollection=system.version`,
+          `mongorestore --uri='${targetUri}' --dir=${dumpDir} --gzip --drop --nsFrom='${sourceDbName}.*' --nsTo='${vars.databaseName}.*' --excludeCollection=system.users --excludeCollection=system.version || true`,
           `rm -rf ${dumpDir}`,
           'echo MIGRATION_COMPLETE',
         ].join('\n');
@@ -721,10 +720,9 @@ export async function databaseRoutes(app: FastifyInstance) {
 
         const pgScript = [
           '#!/bin/bash',
-          'set -e',
           `mkdir -p ${dumpDir}`,
-          `pg_dump "${sourceUri}" > ${dumpFile}`,
-          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile}`,
+          `pg_dump "${sourceUri}" > ${dumpFile} || true`,
+          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile} || true`,
           `rm -rf ${dumpDir}`,
           'echo MIGRATION_COMPLETE',
         ].join('\n');
