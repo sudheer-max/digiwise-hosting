@@ -776,14 +776,9 @@ export async function databaseRoutes(app: FastifyInstance) {
           throw new Error('Migration completed but 0 documents were restored. Check source connection.');
         }
       } else if (type === 'postgresql') {
-        // PostgreSQL: pg_dump + pg_restore — all in a single kubectl exec
-        const dumpFile = `${dumpDir}/dump.sql`;
+        // PostgreSQL: pipe pg_dump directly to psql (no temp files - CNPG pods have read-only root)
         const pgScript = [
-          `mkdir -p ${dumpDir}`,
-          `pg_dump '${sourceUri}' > ${dumpFile} 2>&1`,
-          `if [ \$? -ne 0 ]; then echo "PG_DUMP_FAILED"; rm -rf ${dumpDir}; exit 1; fi`,
-          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile} 2>&1`,
-          `rm -rf ${dumpFile}`,
+          `pg_dump --no-owner --no-acl '${sourceUri}' 2>&1 | PGPASSWORD='${vars.password}' psql -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} 2>&1`,
         ].join(' && ');
 
         let pgOutput = '';
@@ -793,15 +788,12 @@ export async function databaseRoutes(app: FastifyInstance) {
           });
         } catch (execErr: any) {
           pgOutput = execErr.stdout || execErr.stderr || execErr.message || '';
-          // Extract meaningful error from pg_dump/pg_restore output
-          if (pgOutput.includes('PG_DUMP_FAILED') || pgOutput.includes('pg_dump: error')) {
-            const match = pgOutput.match(/(?:pg_dump: error: .+?(?:\n|$))+/i);
-            throw new Error(`Source database connection failed. ${match ? match[0].trim() : pgOutput.substring(0, 500)}`);
+          if (pgOutput.includes('pg_dump: error') || pgOutput.includes('password authentication failed')) {
+            const lines = pgOutput.split('\n').filter(l => l.includes('error') || l.includes('FATAL') || l.includes('failed'));
+            throw new Error(`Source database connection failed. ${lines.join('. ')}`);
           }
           throw new Error(`PostgreSQL migration failed: ${pgOutput.substring(0, 1000)}`);
         }
-
-        try { execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'rm', '-rf', dumpDir], { encoding: 'utf-8', stdio: 'pipe' }); } catch { /* ignore */ }
       }
 
       return reply.status(200).send({
