@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock, ArrowDownToLine } from 'lucide-react';
+import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock, ArrowDownToLine, Wifi, WifiOff } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
@@ -67,6 +67,7 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState('');
   const [activeLang, setActiveLang] = useState('nodejs');
+  const [connectNetwork, setConnectNetwork] = useState<'private' | 'public'>('private');
   const [migrateUri, setMigrateUri] = useState('');
   const [migrateBusy, setMigrateBusy] = useState(false);
   const [migrateResult, setMigrateResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -149,6 +150,9 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const connStr = vars?.internalConnectionString || '';
   const extConnStr = vars?.externalConnectionString || '';
   const portForwardCmd = vars?.portForwardCmd || `kubectl port-forward -n ${namespace} svc/${dbName}-rw ${port}:${port}`;
+  const publicHost = vars?.publicHost || '';
+  const publicPort = vars?.publicPort || 0;
+  const publicConnStr = vars?.publicConnectionString || '';
   const envVars = vars?.envVars || {};
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -280,59 +284,140 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
         </div>
       )}
 
-      {/* Connect Tab */}
+      {/* Connect Tab — Railway style */}
       {tab === 'connect' && (
         <div className="space-y-6">
-          {/* Language Selector */}
-          <div className="flex items-center gap-1 bg-white border border-slate-200 shadow-sm p-1">
-            {[
-              { id: 'nodejs', label: 'Node.js' },
-              { id: 'python', label: 'Python' },
-              { id: 'go', label: 'Go' },
-              { id: 'curl', label: 'CLI' },
-            ].map((lang) => (
-              <button
-                key={lang.id}
-                onClick={() => setActiveLang(lang.id)}
-                className={`flex-1 px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
-                  activeLang === lang.id ? 'bg-[#00459c] text-white' : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {lang.label}
-              </button>
-            ))}
+          {/* Network Toggle */}
+          <div className="bg-white border border-slate-200 shadow-sm p-1 flex">
+            <button
+              onClick={() => setConnectNetwork('private')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold transition-colors cursor-pointer ${
+                connectNetwork === 'private' ? 'bg-[#00459c] text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" /> Private Network
+            </button>
+            <button
+              onClick={() => setConnectNetwork('public')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold transition-colors cursor-pointer ${
+                connectNetwork === 'public' ? 'bg-[#00459c] text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" /> Public Network
+            </button>
           </div>
 
-          {/* Code Snippets */}
-          <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-4">Quick Start</h3>
-            <div className="space-y-4">
-              {(snippets[activeLang] || []).map((s, i) => (
-                <div key={i}>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{s.label}</div>
-                  <div className="flex items-start gap-2">
-                    <pre className="flex-1 bg-slate-950 text-emerald-400 px-3 py-2.5 text-[11px] font-mono overflow-auto rounded-lg">{s.code}</pre>
-                    <CopyButton text={s.code} />
-                  </div>
+          {/* Info Banner */}
+          {connectNetwork === 'public' && publicHost ? (
+            <div className="bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-700 font-semibold">
+              Connecting over the public network may cause egress costs.
+            </div>
+          ) : connectNetwork === 'private' ? (
+            <div className="bg-[#00459c]/5 border border-[#00459c]/20 px-4 py-3 text-xs text-[#00459c] font-semibold">
+              Private Network is only accessible from within the same Kubernetes cluster.
+            </div>
+          ) : null}
+
+          {/* Connection URL */}
+          {connectNetwork === 'private' ? (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-slate-900">Connection URL</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => {}} className="text-[10px] font-bold text-[#00459c] hover:underline cursor-pointer">show</button>
+                  <button onClick={() => {}} className="text-[10px] font-bold text-[#00459c] hover:underline cursor-pointer">open</button>
                 </div>
-              ))}
+              </div>
+              <div className="flex items-center gap-2 bg-slate-950 rounded-lg px-4 py-3">
+                <code className="flex-1 text-xs font-mono text-emerald-400 overflow-auto whitespace-pre-wrap break-all">{connStr}</code>
+                <CopyButton text={connStr} />
+              </div>
             </div>
-          </div>
+          ) : publicHost ? (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-slate-900">Connection URL</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => {}} className="text-[10px] font-bold text-[#00459c] hover:underline cursor-pointer">show</button>
+                  <button onClick={() => {}} className="text-[10px] font-bold text-[#00459c] hover:underline cursor-pointer">open</button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-950 rounded-lg px-4 py-3">
+                <code className="flex-1 text-xs font-mono text-emerald-400 overflow-auto whitespace-pre-wrap break-all">{publicConnStr}</code>
+                <CopyButton text={publicConnStr} />
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 shadow-sm p-8 text-center">
+              <WifiOff className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-900 mb-1">No Public Network</h3>
+              <p className="text-xs text-slate-500">This database does not have a public endpoint configured.</p>
+            </div>
+          )}
 
-          {/* Port Forward */}
-          <div className="bg-white border border-slate-200 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-              <Globe className="w-4 h-4 text-[#00459c]" /> External Access
-            </h3>
-            <p className="text-xs text-slate-500 mb-3">Use port-forward to access this database from your local machine:</p>
-            <div className="flex items-start gap-2">
-              <code className="flex-1 bg-slate-50 border border-slate-200 px-3 py-2.5 text-[11px] font-mono text-slate-700 break-all">{portForwardCmd}</code>
-              <CopyButton text={portForwardCmd} />
+          {/* Connection Details */}
+          {connectNetwork === 'private' ? (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-slate-900 mb-4">Connection Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ConnectionField label="Host" value={host} />
+                <ConnectionField label="Port" value={String(port)} />
+                <ConnectionField label="User" value={username} />
+                <ConnectionField label="Password" value={password} secret />
+                <ConnectionField label="Database" value={dbName} />
+                <ConnectionField label="Namespace" value={namespace} />
+              </div>
             </div>
-            <div className="mt-3 text-[11px] text-slate-500">
-              Then connect to <code className="bg-slate-100 px-1">localhost:{port}</code>
+          ) : publicHost ? (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-slate-900 mb-4">Connection Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ConnectionField label="Host" value={publicHost} />
+                <ConnectionField label="Port" value={String(publicPort)} />
+                <ConnectionField label="User" value={username} />
+                <ConnectionField label="Password" value={password} secret />
+                <ConnectionField label="Database" value={dbName} />
+              </div>
             </div>
-          </div>
+          ) : null}
+
+          {/* Raw CLI Command */}
+          {connectNetwork === 'private' && (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">Raw CLI Command</h3>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 bg-slate-50 border border-slate-200 px-3 py-2.5 text-[11px] font-mono text-slate-700 break-all">{type === 'postgresql' ? `psql "${connStr}"` : type === 'mongodb' ? `mongosh "${connStr}"` : type === 'mysql' ? `mysql -h ${host} -P ${port} -u ${username} -p ${dbName}` : `redis-cli -h ${host} -p ${port}${password ? ` -a ${password}` : ''}`}</code>
+                <CopyButton text={type === 'postgresql' ? `psql "${connStr}"` : type === 'mongodb' ? `mongosh "${connStr}"` : type === 'mysql' ? `mysql -h ${host} -P ${port} -u ${username} -p ${dbName}` : `redis-cli -h ${host} -p ${port}${password ? ` -a ${password}` : ''}`} />
+              </div>
+            </div>
+          )}
+
+          {connectNetwork === 'public' && publicHost && (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">Raw CLI Command</h3>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 bg-slate-50 border border-slate-200 px-3 py-2.5 text-[11px] font-mono text-slate-700 break-all">{type === 'postgresql' ? `psql "${publicConnStr}"` : type === 'mongodb' ? `mongosh "${publicConnStr}"` : type === 'mysql' ? `mysql -h ${publicHost} -P ${publicPort} -u ${username} -p ${dbName}` : `redis-cli -h ${publicHost} -p ${publicPort}${password ? ` -a ${password}` : ''}`}</code>
+                <CopyButton text={type === 'postgresql' ? `psql "${publicConnStr}"` : type === 'mongodb' ? `mongosh "${publicConnStr}"` : type === 'mysql' ? `mysql -h ${publicHost} -P ${publicPort} -u ${username} -p ${dbName}` : `redis-cli -h ${publicHost} -p ${publicPort}${password ? ` -a ${password}` : ''}`} />
+              </div>
+            </div>
+          )}
+
+          {/* Port Forward (Private only) */}
+          {connectNetwork === 'private' && (
+            <div className="bg-white border border-slate-200 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-[#00459c]" /> Access from Local Machine
+              </h3>
+              <p className="text-xs text-slate-500 mb-3">Use port-forward to access this database from your local machine:</p>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 bg-slate-50 border border-slate-200 px-3 py-2.5 text-[11px] font-mono text-slate-700 break-all">{portForwardCmd}</code>
+                <CopyButton text={portForwardCmd} />
+              </div>
+              <div className="mt-3 text-[11px] text-slate-500">
+                Then connect to <code className="bg-slate-100 px-1">localhost:{port}</code>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

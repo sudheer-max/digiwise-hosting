@@ -791,6 +791,21 @@ async function getDatabaseVariables(namespace: string, type: string, name: strin
   const portForwardCmd = `kubectl port-forward -n ${namespace} svc/${type === 'postgresql' ? name + '-rw' : type === 'mongodb' ? name : type === 'mysql' ? name + '-router' : name} ${port}:${port}`;
   const externalConnectionString = buildConnectionString(type, 'localhost', port, username, password, databaseName);
 
+  // Public Network: look up NodePort for external access
+  let publicHost = '';
+  let publicPort = 0;
+  let publicConnectionString = '';
+  try {
+    const svcName = `${name}-rw-external`;
+    const svc = await k8s.k8sCoreApi.readNamespacedService({ name: svcName, namespace });
+    const nodePort = svc.spec?.ports?.[0]?.nodePort;
+    if (nodePort) {
+      publicHost = '172.105.49.201';
+      publicPort = nodePort;
+      publicConnectionString = buildConnectionString(type, publicHost, publicPort, username, password, databaseName);
+    }
+  } catch { /* no external service */ }
+
   // Environment variables
   const envVars: Record<string, string> = {};
   if (type === 'postgresql') {
@@ -833,6 +848,9 @@ async function getDatabaseVariables(namespace: string, type: string, name: strin
     internalConnectionString,
     externalConnectionString,
     portForwardCmd,
+    publicHost,
+    publicPort,
+    publicConnectionString,
     envVars,
   };
 }
