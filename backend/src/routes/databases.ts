@@ -85,6 +85,27 @@ export async function databaseRoutes(app: FastifyInstance) {
         await createRedisInstance(namespace, name, resources);
       }
 
+      // Create NodePort for external access
+      const port = type === 'postgresql' ? 5432 : type === 'mongodb' ? 27017 : type === 'mysql' ? 3306 : 6379;
+      const targetSvc = type === 'postgresql' ? `${name}-rw` : type === 'mongodb' ? name : type === 'mysql' ? `${name}-router` : name;
+      try {
+        await k8s.k8sCoreApi.createNamespacedService({
+          namespace,
+          body: {
+            apiVersion: 'v1',
+            kind: 'Service',
+            metadata: { name: `${name}-rw-external`, namespace },
+            spec: {
+              type: 'NodePort',
+              selector: type === 'postgresql'
+                ? { cnpg.io/cluster: name, role: 'rw' }
+                : { app: name },
+              ports: [{ port, targetPort: port, nodePort: 30100 + Math.floor(Math.random() * 2600) }],
+            },
+          },
+        });
+      } catch { /* external service may already exist */ }
+
       return reply.status(201).send({
         type,
         name,
@@ -576,7 +597,7 @@ async function createPostgresInstance(namespace: string, name: string, resources
       },
       storage: {
         size: resources.storage,
-        storageClassName: 'local-path',
+        storageClass: 'local-path',
       },
       resources: {
         requests: {
