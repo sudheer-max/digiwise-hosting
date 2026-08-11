@@ -780,13 +780,28 @@ export async function databaseRoutes(app: FastifyInstance) {
         const dumpFile = `${dumpDir}/dump.sql`;
         const pgScript = [
           `mkdir -p ${dumpDir}`,
-          `pg_dump '${sourceUri}' > ${dumpFile}`,
-          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile}`,
-          `rm -rf ${dumpDir}`,
+          `pg_dump '${sourceUri}' > ${dumpFile} 2>&1`,
+          `if [ \$? -ne 0 ]; then echo "PG_DUMP_FAILED"; rm -rf ${dumpDir}; exit 1; fi`,
+          `PGPASSWORD='${vars.password}' pg_restore -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} --clean --if-exists < ${dumpFile} 2>&1`,
+          `rm -rf ${dumpFile}`,
         ].join(' && ');
-        execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', pgScript], {
-          encoding: 'utf-8', timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'],
-        });
+
+        let pgOutput = '';
+        try {
+          pgOutput = execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', pgScript], {
+            encoding: 'utf-8', timeout: 300000, stdio: ['pipe', 'pipe', 'pipe'],
+          });
+        } catch (execErr: any) {
+          pgOutput = execErr.stdout || execErr.stderr || execErr.message || '';
+          // Extract meaningful error from pg_dump/pg_restore output
+          if (pgOutput.includes('PG_DUMP_FAILED') || pgOutput.includes('pg_dump: error')) {
+            const match = pgOutput.match(/(?:pg_dump: error: .+?(?:\n|$))+/i);
+            throw new Error(`Source database connection failed. ${match ? match[0].trim() : pgOutput.substring(0, 500)}`);
+          }
+          throw new Error(`PostgreSQL migration failed: ${pgOutput.substring(0, 1000)}`);
+        }
+
+        try { execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'rm', '-rf', dumpDir], { encoding: 'utf-8', stdio: 'pipe' }); } catch { /* ignore */ }
       }
 
       return reply.status(200).send({
@@ -1073,7 +1088,7 @@ async function getDatabaseVariables(namespace: string, type: string, name: strin
       const data = secret.data || {};
       username = Buffer.from(data['username'] || '', 'base64').toString('utf-8') || 'postgres';
       password = Buffer.from(data['password'] || '', 'base64').toString('utf-8') || '';
-      databaseName = Buffer.from(data['db-name'] || '', 'base64').toString('utf-8') || name;
+      databaseName = Buffer.from(data['db-name'] || data['dbname'] || '', 'base64').toString('utf-8') || name;
       host = `${name}-rw.${namespace}.svc.cluster.local`;
       port = def.port;
     } else if (type === 'mongodb') {
