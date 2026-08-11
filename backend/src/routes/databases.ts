@@ -776,10 +776,9 @@ export async function databaseRoutes(app: FastifyInstance) {
           throw new Error('Migration completed but 0 documents were restored. Check source connection.');
         }
       } else if (type === 'postgresql') {
-        // PostgreSQL: pipe pg_dump directly to psql (no temp files - CNPG pods have read-only root)
-        const pgScript = [
-          `pg_dump --no-owner --no-acl '${sourceUri}' 2>&1 | PGPASSWORD='${vars.password}' psql -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} 2>&1`,
-        ].join(' && ');
+        // PostgreSQL: pg_dump piped to psql (read-only CNPG root, no temp files)
+        // pipefail ensures pg_dump errors cause the whole command to fail
+        const pgScript = `set -o pipefail; pg_dump --no-owner --no-acl '${sourceUri}' 2>&1 | PGPASSWORD='${vars.password}' psql -h ${vars.host} -p ${vars.port} -U ${vars.username} -d ${vars.databaseName} 2>&1`;
 
         let pgOutput = '';
         try {
@@ -788,7 +787,7 @@ export async function databaseRoutes(app: FastifyInstance) {
           });
         } catch (execErr: any) {
           pgOutput = execErr.stdout || execErr.stderr || execErr.message || '';
-          if (pgOutput.includes('pg_dump: error') || pgOutput.includes('password authentication failed')) {
+          if (pgOutput.includes('pg_dump: error') || pgOutput.includes('password authentication failed') || pgOutput.includes('FATAL')) {
             const lines = pgOutput.split('\n').filter(l => l.includes('error') || l.includes('FATAL') || l.includes('failed'));
             throw new Error(`Source database connection failed. ${lines.join('. ')}`);
           }
