@@ -810,9 +810,9 @@ export async function databaseRoutes(app: FastifyInstance) {
       const restoreName = type === 'mongodb' ? 'mongorestore' : 'pg_restore';
       return reply.status(500).send({
         error: 'Migration failed',
-        details: errMsg.includes(toolName) ? `Failed to dump data from source. Check your connection string.` :
-                 errMsg.includes(restoreName) ? `Failed to restore data to target. Check if the target database is accessible.` :
-                 errMsg,
+        details: errMsg.includes(toolName) || errMsg.includes('Source database connection failed') ? `Failed to dump data from source: ${errMsg.substring(0, 500)}` :
+                 errMsg.includes(restoreName) ? `Failed to restore data to target: ${errMsg.substring(0, 500)}` :
+                 errMsg.substring(0, 500),
       });
     }
   });
