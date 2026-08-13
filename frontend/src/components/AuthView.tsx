@@ -280,34 +280,38 @@ export default function AuthView({ initialMode = 'login', onAuthSuccess, onCance
               </button>
             </form>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-2 bg-white text-slate-400 font-semibold">OR</span>
-              </div>
-            </div>
+            {process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-white text-slate-400 font-semibold">OR</span>
+                  </div>
+                </div>
 
-            <button
-              onClick={handleGithubLogin}
-              disabled={isAuthenticating}
-              className={`w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 border border-slate-800 ${
-                isAuthenticating ? 'opacity-80 cursor-not-allowed' : ''
-              }`}
-            >
-              {isAuthenticating ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin"></span>
-                  CONNECTING GITHUB AUTH...
-                </>
-              ) : (
-                <>
-                  <Github className="w-4 h-4 fill-white" />
-                  CONTINUE WITH GITHUB
-                </>
-              )}
-            </button>
+                <button
+                  onClick={handleGithubLogin}
+                  disabled={isAuthenticating}
+                  className={`w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2.5 border border-slate-800 ${
+                    isAuthenticating ? 'opacity-80 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isAuthenticating ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin"></span>
+                      CONNECTING GITHUB AUTH...
+                    </>
+                  ) : (
+                    <>
+                      <Github className="w-4 h-4 fill-white" />
+                      CONTINUE WITH GITHUB
+                    </>
+                  )}
+                </button>
+              </>
+            )}
 
             <div className="text-center">
               <button
