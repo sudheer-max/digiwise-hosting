@@ -22,7 +22,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/legal/') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/checkout') ||
-    pathname.startsWith('/support');
+    pathname.startsWith('/support') ||
+    pathname.startsWith('/email');
 
   useEffect(() => {
     if (!user && !loading && !isPublicRoute) {

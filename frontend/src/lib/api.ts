@@ -388,55 +388,85 @@ class ApiClient {
     });
   }
 
-  // === EMAIL ===
+  // === EMAIL (Session-based, no auth required) ===
 
-  getEmailConfig() {
-    return this.request('/email/config');
+  private emailToken: string | null = null;
+
+  setEmailToken(token: string) {
+    this.emailToken = token;
+    if (typeof window !== 'undefined') localStorage.setItem('email_token', token);
   }
 
-  saveEmailConfig(config: { email: string; password: string; host?: string; port?: number; secure?: boolean; fromName?: string }) {
-    return this.request('/email/config', {
-      method: 'POST',
-      body: JSON.stringify(config),
+  getEmailToken(): string | null {
+    if (!this.emailToken) {
+      this.emailToken = typeof window !== 'undefined' ? localStorage.getItem('email_token') : null;
+    }
+    return this.emailToken;
+  }
+
+  clearEmailToken() {
+    this.emailToken = null;
+    if (typeof window !== 'undefined') localStorage.removeItem('email_token');
+  }
+
+  private emailRequest(path: string, options: RequestInit = {}) {
+    const token = this.getEmailToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
+    };
+    if (token) headers['X-Email-Token'] = token;
+    return fetch(`${API_BASE}${path}`, { ...options, headers }).then(async (r) => {
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Request failed'); }
+      return r.json();
     });
   }
 
-  deleteEmailConfig() {
-    return this.request('/email/config', { method: 'DELETE' });
+  createEmailSession(config: { email: string; password: string; host?: string; port?: number; secure?: boolean; fromName?: string }) {
+    return fetch(`${API_BASE}/api/email/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to create session');
+      if (data.token) this.setEmailToken(data.token);
+      return data;
+    });
   }
 
-  testEmail() {
-    return this.request('/email/test', { method: 'POST' });
+  checkEmailSession() {
+    return this.emailRequest('/api/email/session');
+  }
+
+  deleteEmailSession() {
+    return this.emailRequest('/api/email/session', { method: 'DELETE' }).then((r) => {
+      this.clearEmailToken();
+      return r;
+    });
   }
 
   sendEmail(to: string, subject: string, body: string) {
-    return this.request('/email/send', {
+    return this.emailRequest('/api/email/send', {
       method: 'POST',
       body: JSON.stringify({ to, subject, body }),
     });
   }
 
   listInbox() {
-    return this.request('/email/inbox');
+    return this.emailRequest('/api/email/inbox');
   }
 
   listSent() {
-    return this.request('/email/sent');
+    return this.emailRequest('/api/email/sent');
   }
 
   getEmailMessage(id: string) {
-    return this.request(`/email/messages/${id}`);
+    return this.emailRequest(`/api/email/messages/${id}`);
   }
 
   deleteEmailMessage(id: string) {
-    return this.request(`/email/messages/${id}`, { method: 'DELETE' });
-  }
-
-  markEmailRead(id: string, read: boolean) {
-    return this.request(`/email/messages/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ read }),
-    });
+    return this.emailRequest(`/api/email/messages/${id}`, { method: 'DELETE' });
   }
 
   // === GITHUB DEPLOY ===

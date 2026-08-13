@@ -1,660 +1,506 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Mail, Plus, Trash2, KeyRound, ShieldCheck, HardDrive, Inbox, ExternalLink,
-  Monitor, Smartphone, Laptop, Copy, Check, ChevronDown, ChevronUp,
-  Server, Settings, Globe, ShoppingCart, ListOrdered, Link2
+  Mail, Inbox, Send, Trash2, ArrowLeft, Plus, Search, Reply, ReplyAll,
+  Forward, Star, Archive, RefreshCw, Loader2, Settings, LogOut, ChevronDown,
+  Compose, X, Paperclip
 } from 'lucide-react';
 import api from '../lib/api';
-import { useAuth } from '../context/AuthContext';
 
-interface EmailAccount {
-  address: string;
-  status: 'ACTIVE' | 'INACTIVE';
-  storageUsed: number;
-  storageTotal: number;
-  protocols: string;
-}
-
-interface SetupGuide {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-  description: string;
-  steps: string[];
-  settings: { label: string; value: string }[];
-}
-
-const EMAIL_CLIENTS: SetupGuide[] = [
-  {
-    id: 'outlook',
-    name: 'Microsoft Outlook',
-    icon: <Monitor className="w-5 h-5" />,
-    description: 'Setup your DigiWise email in Outlook for Windows, Mac, or Web.',
-    steps: [
-      'Open Microsoft Outlook and go to File > Add Account.',
-      'Enter your full email address (e.g., admin@digiwisesoftech.com).',
-      'When prompted, select "IMAP" as the account type.',
-      'Enter the incoming and outgoing server settings below.',
-      'Enter your email password when prompted.',
-      'Click "Finish" to complete setup.',
-    ],
-    settings: [
-      { label: 'Email Address', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Incoming Server (IMAP)', value: 'mail.digiwisesoftech.com' },
-      { label: 'IMAP Port', value: '993 (SSL/TLS)' },
-      { label: 'Outgoing Server (SMTP)', value: 'mail.digiwisesoftech.com' },
-      { label: 'SMTP Port', value: '465 (SSL/TLS)' },
-      { label: 'Username', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Password', value: 'Your email password' },
-      { label: 'Encryption', value: 'SSL/TLS' },
-    ],
-  },
-  {
-    id: 'apple-mail',
-    name: 'Apple Mail',
-    icon: <Laptop className="w-5 h-5" />,
-    description: 'Configure DigiWise email on macOS Mail app or iOS Mail.',
-    steps: [
-      'Open the Mail app on your Mac or iOS device.',
-      'Go to Mail > Add Account (macOS) or Settings > Mail > Accounts > Add Account (iOS).',
-      'Select "Other Mail Account..." and click Continue.',
-      'Enter your name, email address, and password.',
-      'Select IMAP as the account type.',
-      'Enter the server settings below.',
-      'Choose which apps (Mail, Notes) to sync and click Done.',
-    ],
-    settings: [
-      { label: 'Email Address', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Incoming Mail Server', value: 'mail.digiwisesoftech.com' },
-      { label: 'Incoming Port', value: '993' },
-      { label: 'Outgoing Mail Server', value: 'mail.digiwisesoftech.com' },
-      { label: 'Outgoing Port', value: '465' },
-      { label: 'Username', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Password', value: 'Your email password' },
-      { label: 'Outgoing TLS', value: 'SSL/TLS' },
-    ],
-  },
-  {
-    id: 'thunderbird',
-    name: 'Mozilla Thunderbird',
-    icon: <Globe className="w-5 h-5" />,
-    description: 'Setup your DigiWise email in Thunderbird email client.',
-    steps: [
-      'Open Thunderbird and go to Email under the Account Setup section.',
-      'Click "Skip this and use my existing email".',
-      'Enter your name, email address, and password.',
-      'Thunderbird will attempt to auto-detect settings. If it fails, click "Configure manually".',
-      'Enter the IMAP and SMTP server settings below.',
-      'Click "Done" to finish setup.',
-    ],
-    settings: [
-      { label: 'Email Address', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Incoming Server (IMAP)', value: 'mail.digiwisesoftech.com' },
-      { label: 'Incoming Port', value: '993' },
-      { label: 'Incoming SSL', value: 'SSL/TLS' },
-      { label: 'Outgoing Server (SMTP)', value: 'mail.digiwisesoftech.com' },
-      { label: 'Outgoing Port', value: '465' },
-      { label: 'Outgoing SSL', value: 'SSL/TLS' },
-      { label: 'Username', value: 'yourname@digiwisesoftech.com' },
-    ],
-  },
-  {
-    id: 'gmail-import',
-    name: 'Gmail / Google Workspace',
-    icon: <Mail className="w-5 h-5" />,
-    description: 'Import your DigiWise email into Gmail using POP3 or forward automatically.',
-    steps: [
-      'Log in to your Gmail account.',
-      'Go to Settings > See all settings > Accounts and Import.',
-      'Click "Import mail and contacts" or "Add a mail account".',
-      'Enter your DigiWise email address.',
-      'Choose IMAP and enter the server settings below.',
-      'Select labels and click "Start Import".',
-    ],
-    settings: [
-      { label: 'Email Address', value: 'yourname@digiwisesoftech.com' },
-      { label: 'IMAP Server', value: 'mail.digiwisesoftech.com' },
-      { label: 'IMAP Port', value: '993' },
-      { label: 'IMAP SSL', value: 'Yes (TLS)' },
-      { label: 'SMTP Server', value: 'mail.digiwisesoftech.com' },
-      { label: 'SMTP Port', value: '465' },
-      { label: 'SMTP SSL', value: 'Yes (TLS)' },
-      { label: 'Username', value: 'yourname@digiwisesoftech.com' },
-    ],
-  },
-  {
-    id: 'mobile',
-    name: 'Mobile Devices',
-    icon: <Smartphone className="w-5 h-5" />,
-    description: 'Configure email on iPhone, iPad, or Android native mail apps.',
-    steps: [
-      'Open the Mail app (iOS) or Gmail/Email app (Android).',
-      'Tap "Add Account" and select "Other" or "Manual Setup".',
-      'Enter your email address and password.',
-      'Choose IMAP as the account type.',
-      'Enter the incoming and outgoing server settings.',
-      'Save and wait for your mailbox to sync.',
-    ],
-    settings: [
-      { label: 'Email Address', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Incoming Server', value: 'mail.digiwisesoftech.com' },
-      { label: 'Incoming Port', value: '993' },
-      { label: 'Outgoing Server', value: 'mail.digiwisesoftech.com' },
-      { label: 'Outgoing Port', value: '465' },
-      { label: 'Username', value: 'yourname@digiwisesoftech.com' },
-      { label: 'Password', value: 'Your email password' },
-      { label: 'Encryption', value: 'SSL/TLS' },
-    ],
-  },
-];
+type View = 'setup' | 'inbox' | 'sent' | 'compose' | 'read';
 
 export default function EmailView() {
-  const { user } = useAuth();
-  const [plan, setPlan] = useState<any>(null);
-  const [planLoading, setPlanLoading] = useState(true);
-  const [emails, setEmails] = useState<EmailAccount[]>([]);
-  const [newUsername, setNewUsername] = useState('');
-  const [newDomain, setNewDomain] = useState('');
-  const [newStorage, setNewStorage] = useState(128);
-  const [newPassword, setNewPassword] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [view, setView] = useState<View>('setup');
+  const [configured, setConfigured] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fromName, setFromName] = useState('');
+  const [setupError, setSetupError] = useState('');
+  const [setupBusy, setSetupBusy] = useState(false);
 
+  const [composeTo, setComposeTo] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Check if session exists on mount
   useEffect(() => {
-    api.getPlan().then(p => setPlan(p)).catch(() => setPlan(null)).finally(() => setPlanLoading(false));
+    const token = api.getEmailToken();
+    if (token) {
+      api.checkEmailSession().then((data: any) => {
+        if (data?.configured) {
+          setConfigured(true);
+          setView('inbox');
+          setEmail(data.email || '');
+        }
+      }).catch(() => {
+        api.clearEmailToken();
+      });
+    }
   }, []);
 
-  const hasPaidPlan = user?.role === 'admin' || (plan && plan.plan && plan.plan.key !== 'trial' && plan.planStatus === 'active');
-
-  const handleCreateEmail = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUsername || !newPassword) return;
-    const fullAddress = `${newUsername.trim()}@${newDomain}`;
-    if (emails.some(item => item.address === fullAddress)) {
-      alert('Email account already exists!');
-      return;
+  const loadMessages = useCallback(async (folder: string) => {
+    setLoading(true);
+    try {
+      const msgs = folder === 'sent' ? await api.listSent() : await api.listInbox();
+      setMessages(Array.isArray(msgs) ? msgs : []);
+    } catch (err: any) {
+      console.error('Failed to load messages:', err);
     }
-    setEmails([
-      ...emails,
-      { address: fullAddress, status: 'ACTIVE', storageUsed: 0, storageTotal: Number(newStorage), protocols: 'IMAP/SMTP' },
-    ]);
-    setNewUsername('');
-    setNewPassword('');
-    setIsCreating(false);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (configured && (view === 'inbox' || view === 'sent')) {
+      loadMessages(view);
+    }
+  }, [view, configured, loadMessages]);
+
+  const handleSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    setSetupBusy(true);
+    setSetupError('');
+    try {
+      await api.createEmailSession({ email, password, fromName: fromName || undefined });
+      setConfigured(true);
+      setView('inbox');
+    } catch (err: any) {
+      setSetupError(err.message || 'Failed to connect');
+    }
+    setSetupBusy(false);
   };
 
-  const handleDeleteEmail = (address: string) => {
-    setEmails(emails.filter(e => e.address !== address));
+  const handleLogout = async () => {
+    try { await api.deleteEmailSession(); } catch { /* ignore */ }
+    setConfigured(false);
+    setView('setup');
+    setEmail('');
+    setPassword('');
+    setMessages([]);
+    setSelected(null);
   };
 
-  const copyToClipboard = (text: string, fieldId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldId);
-    setTimeout(() => setCopiedField(null), 2000);
+  const openMessage = (msg: any) => {
+    setSelected(msg);
+    setView('read');
   };
 
-  const totalStorageUsed = emails.reduce((acc, curr) => acc + curr.storageUsed, 0);
-  const totalStorageAllocated = emails.reduce((acc, curr) => acc + curr.storageTotal, 0);
+  const handleSend = async () => {
+    if (!composeTo || !composeSubject || !composeBody) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      await api.sendEmail(composeTo, composeSubject, composeBody);
+      setSendResult({ type: 'success', message: 'Email sent!' });
+      setComposeTo('');
+      setComposeSubject('');
+      setComposeBody('');
+      setTimeout(() => { setSendResult(null); setView('sent'); }, 1200);
+    } catch (err: any) {
+      setSendResult({ type: 'error', message: err.message || 'Failed' });
+    }
+    setSending(false);
+  };
 
-  const card = 'bg-white border border-slate-200 shadow-sm';
-  const inputCls = 'w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#00459c] px-3 py-2 text-xs text-slate-900 outline-none placeholder:text-slate-400 font-semibold transition-colors';
-  const selectCls = 'w-full bg-white border border-slate-200 focus:border-[#00459c] px-2 py-2 text-xs font-semibold outline-none text-slate-900 transition-colors';
-  const labelCls = 'text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5';
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteEmailMessage(id);
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+      if (selected?.id === id) { setSelected(null); setView('inbox'); }
+    } catch { /* ignore */ }
+  };
 
-  return (
-    <div className="animate-fade-in p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 bg-[#f5f7fb] text-slate-600 min-h-screen">
+  const formatDate = (d: string) => {
+    if (!d) return '';
+    const date = new Date(d);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    if (isNaN(diff)) return d;
+    if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diff < 604800000) return date.toLocaleDateString([], { weekday: 'short' });
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
 
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-display">Business Email</h1>
-          <p className="text-slate-500 text-sm mt-1">Provision, secure, and manage enterprise-grade email with dedicated storage.</p>
-        </div>
-        {hasPaidPlan ? (
-          <button
-            onClick={() => setIsCreating(!isCreating)}
-            className="bg-[#00459c] hover:bg-[#003882] text-white text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Create Email Account
-          </button>
-        ) : (
-          <a href="/checkout" className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider px-5 py-3 transition-colors flex items-center gap-1.5">
-            <ShoppingCart className="w-4 h-4" /> Purchase Plan
-          </a>
-        )}
-      </div>
+  const filtered = messages.filter((m) =>
+    !search || m.subject?.toLowerCase().includes(search.toLowerCase()) ||
+    m.from?.toLowerCase().includes(search.toLowerCase()) ||
+    m.to?.toLowerCase().includes(search.toLowerCase())
+  );
 
-      {!hasPaidPlan && !planLoading && (
-        <div className="bg-white border border-slate-200 shadow-sm p-10 text-center">
-          <Mail className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Plan required</h3>
-          <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
-            Purchase a VPS hosting plan to create and manage business email accounts.
-          </p>
-          <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-3 transition-colors">
-            <ShoppingCart className="w-4 h-4" /> Purchase Plan
-          </a>
-        </div>
-      )}
+  const getInitials = (addr: string) => {
+    const name = addr?.split('@')[0] || '?';
+    return name.slice(0, 2).toUpperCase();
+  };
 
-      {hasPaidPlan && (<>
-      {/* METRICS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`${card} p-5`}>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Created Accounts</span>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{emails.length} of 10</div>
-          <div className="w-full h-1.5 bg-slate-100 mt-3 overflow-hidden">
-            <div className="h-full bg-[#00459c]" style={{ width: `${(emails.length / 10) * 100}%` }}></div>
+  const getAvatarColor = (addr: string) => {
+    const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-pink-500'];
+    let hash = 0;
+    for (let i = 0; i < (addr || '').length; i++) hash = addr.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // ====== SETUP SCREEN ======
+  if (!configured) {
+    return (
+      <div className="min-h-screen bg-[#f6f8fc] flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-[#00459c] mx-auto mb-4 flex items-center justify-center">
+              <Mail className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">DigiWise Mail</h1>
+            <p className="text-sm text-slate-500 mt-1">Connect your Gmail to send and receive emails</p>
           </div>
-        </div>
-        <div className={`${card} p-5`}>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Allocated Storage</span>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{totalStorageUsed} MB of {totalStorageAllocated} MB</div>
-          <div className="w-full h-1.5 bg-slate-100 mt-3 overflow-hidden">
-            <div className="h-full bg-emerald-500" style={{ width: `${(totalStorageUsed / totalStorageAllocated) * 100}%` }}></div>
-          </div>
-        </div>
-        <div className={`${card} p-5 flex items-center gap-4`}>
-          <div className="w-10 h-10 bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Spam Protection</span>
-            <span className="font-extrabold text-emerald-600 text-sm block mt-0.5">ACTIVE & PREMIUM</span>
-          </div>
-        </div>
-      </div>
 
-      {/* CREATE FORM */}
-      {isCreating && (
-        <div className={`${card} p-6`}>
-          <h3 className="font-bold text-slate-900 text-sm mb-4">Create New Business Email</h3>
-          <form onSubmit={handleCreateEmail} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-            <div>
-              <label className={labelCls}>Username / Mailbox</label>
-              <div className="flex border border-slate-200 bg-slate-50 focus-within:border-[#00459c]">
+          <div className="bg-white border border-slate-200 shadow-sm p-8">
+            <h2 className="text-sm font-bold text-slate-900 mb-1">Connect Your Email</h2>
+            <p className="text-xs text-slate-500 mb-6">Enter your Gmail address and App Password to get started.</p>
+
+            <form onSubmit={handleSetup} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Gmail Address *</label>
                 <input
-                  type="text"
-                  placeholder="e.g. sales"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full bg-transparent border-none outline-none text-xs px-3 py-2 text-slate-900 placeholder:text-slate-400"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@gmail.com"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[#00459c] focus:bg-white transition-colors"
                   required
                 />
-                <span className="bg-slate-200 px-2.5 py-2 text-slate-600 font-mono text-xs border-l border-slate-300">@</span>
               </div>
-            </div>
-            <div>
-              <label className={labelCls}>Domain Name</label>
-              <input type="text" placeholder="yourdomain.com" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} className={inputCls} required />
-            </div>
-            <div>
-              <label className={labelCls}>Storage Limit (MB)</label>
-              <select value={newStorage} onChange={(e) => setNewStorage(Number(e.target.value))} className={selectCls}>
-                <option value={128}>128 MB</option>
-                <option value={256}>256 MB</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Secure Password</label>
-              <input type="password" placeholder="********" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} required />
-            </div>
-            <div className="sm:col-span-4 flex justify-end gap-2.5 pt-2">
-              <button type="button" onClick={() => setIsCreating(false)} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold px-4 py-2 text-xs cursor-pointer">Cancel</button>
-              <button type="submit" className="bg-[#00459c] hover:bg-[#003882] text-white font-bold px-4 py-2 text-xs cursor-pointer">Save Mailbox</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* MAILBOXES TABLE */}
-      <div className={`${card} p-6`}>
-        <h3 className="font-extrabold text-slate-900 text-base mb-4">Active Mailboxes</h3>
-        <div className="overflow-x-auto text-xs">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                <th className="py-2.5 px-2">EMAIL ADDRESS</th>
-                <th className="py-2.5 px-2">STATUS</th>
-                <th className="py-2.5 px-2">STORAGE ALLOCATION</th>
-                <th className="py-2.5 px-2">PROTOCOLS</th>
-                <th className="py-2.5 px-2 text-right">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {emails.map((email) => {
-                const percent = email.storageTotal > 0 ? (email.storageUsed / email.storageTotal) * 100 : 0;
-                return (
-                  <tr key={email.address} className="border-b border-slate-100 hover:bg-slate-50/50">
-                    <td className="py-4 px-2">
-                      <div className="flex items-center gap-2">
-                        <Inbox className="w-4 h-4 text-[#00459c]" />
-                        <span className="font-bold text-slate-900">{email.address}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-2">
-                      <span className="inline-block bg-emerald-50 text-emerald-700 text-[9px] font-bold px-2 py-0.5 border border-emerald-100">ACTIVE</span>
-                    </td>
-                    <td className="py-4 px-2">
-                      <div className="w-36">
-                        <div className="flex justify-between text-[10px] text-slate-500 font-mono mb-1">
-                           <span>{email.storageUsed} / {email.storageTotal} MB</span>
-                          <span>{percent.toFixed(0)}%</span>
-                        </div>
-                        <div className="w-full h-1 bg-slate-100 overflow-hidden">
-                          <div className="h-full bg-cyan-500" style={{ width: `${percent}%` }}></div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-2 font-mono text-slate-500 font-semibold">{email.protocols}</td>
-                    <td className="py-4 px-2 text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <button className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold px-2.5 py-1.5 text-xs cursor-pointer">
-                          <span className="flex items-center gap-1.5"><KeyRound className="w-3.5 h-3.5" /> Reset PW</span>
-                        </button>
-                        <button onClick={() => handleDeleteEmail(email.address)} className="border border-rose-200 text-rose-600 hover:bg-rose-50 p-1.5 cursor-pointer">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* DNS CONFIGURATION */}
-      {(() => {
-        const uniqueDomains = [...new Set(emails.map(e => e.address.split('@')[1]))];
-        if (uniqueDomains.length === 0) return null;
-        return (
-          <div className={`${card} p-6`}>
-            <div className="flex items-center gap-3 mb-4">
-              <Link2 className="w-5 h-5 text-[#00459c]" />
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">DNS Configuration</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Add these records to your domain DNS to receive email.</p>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">App Password *</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="xxxx xxxx xxxx xxxx"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c] focus:bg-white transition-colors"
+                  required
+                />
               </div>
-            </div>
-            {uniqueDomains.map((domain) => {
-              const domainId = `dns-${domain}`;
-              const isExpanded = expandedGuide === domainId;
-              return (
-                <div key={domain} className="border border-slate-200 mb-3 last:mb-0">
-                  <button
-                    onClick={() => setExpandedGuide(isExpanded ? null : domainId)}
-                    className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-4 h-4 text-[#00459c]" />
-                      <span className="font-bold text-slate-900 text-sm">{domain}</span>
-                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 uppercase tracking-wider">Needs Setup</span>
-                    </div>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                  </button>
-                  {isExpanded && (
-                    <div className="border-t border-slate-200 bg-slate-50/30 p-5 space-y-4">
-                      <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-4 py-2.5 font-semibold">
-                        Add the following records at your domain registrar (e.g., GoDaddy, Namecheap, Cloudflare).
-                      </div>
-                      <div className="space-y-3">
-                        {/* MX Record */}
-                        <div className="bg-white border border-slate-200 overflow-hidden">
-                          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                            <div>
-                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
-                              <span className="ml-2 text-xs font-bold text-slate-900 bg-[#00459c]/10 text-[#00459c] px-2 py-0.5">MX</span>
-                            </div>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Priority 10</span>
-                          </div>
-                          <div className="px-4 py-2.5 flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">@</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">mail.digiwisesoftech.com</span>
-                              </div>
-                            </div>
-                            <button onClick={() => copyToClipboard('mail.digiwisesoftech.com', `mx-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
-                              {copiedField === `mx-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                        {/* SPF Record */}
-                        <div className="bg-white border border-slate-200 overflow-hidden">
-                          <div className="px-4 py-2.5 border-b border-slate-100">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
-                            <span className="ml-2 text-xs font-bold text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5">TXT</span>
-                          </div>
-                          <div className="px-4 py-2.5 flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">@</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">"v=spf1 mx a ip4:172.105.49.201 ~all"</span>
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-semibold">SPF — Authorize our server to send email on your behalf.</div>
-                            </div>
-                            <button onClick={() => copyToClipboard('v=spf1 mx a ip4:172.105.49.201 ~all', `spf-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
-                              {copiedField === `spf-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                        {/* DKIM Record */}
-                        <div className="bg-white border border-slate-200 overflow-hidden">
-                          <div className="px-4 py-2.5 border-b border-slate-100">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
-                            <span className="ml-2 text-xs font-bold text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5">TXT</span>
-                          </div>
-                          <div className="px-4 py-2.5 flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">default._domainkey</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
-                                <span className="text-xs font-mono font-bold text-slate-900 break-all">v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3QEKyU1fSma0N3M4...</span>
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-semibold">DKIM — Cryptographically signs outgoing email to prevent spoofing.</div>
-                            </div>
-                            <button onClick={() => copyToClipboard('v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3QEKyU1fSma0N3M4...', `dkim-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
-                              {copiedField === `dkim-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                        {/* DMARC Record */}
-                        <div className="bg-white border border-slate-200 overflow-hidden">
-                          <div className="px-4 py-2.5 border-b border-slate-100">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
-                            <span className="ml-2 text-xs font-bold text-slate-900 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5">TXT</span>
-                          </div>
-                          <div className="px-4 py-2.5 flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">_dmarc</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">v=DMARC1; p=quarantine; rua=mailto:dmarc@{domain}</span>
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-semibold">DMARC — Policy for handling unauthenticated email sent from your domain.</div>
-                            </div>
-                            <button onClick={() => copyToClipboard(`v=DMARC1; p=quarantine; rua=mailto:dmarc@${domain}`, `dmarc-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
-                              {copiedField === `dmarc-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                        {/* A Record for mail subdomain */}
-                        <div className="bg-white border border-slate-200 overflow-hidden">
-                          <div className="px-4 py-2.5 border-b border-slate-100">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Type</span>
-                            <span className="ml-2 text-xs font-bold text-slate-900 bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5">A</span>
-                          </div>
-                          <div className="px-4 py-2.5 flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Host</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">mail</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 font-semibold w-16">Value</span>
-                                <span className="text-xs font-mono font-bold text-slate-900">172.105.49.201</span>
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-semibold">A Record — Points mail.{domain} to our mail server IP.</div>
-                            </div>
-                            <button onClick={() => copyToClipboard('172.105.49.201', `a-${domain}`)} className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-1">
-                              {copiedField === `a-${domain}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Display Name (optional)</label>
+                <input
+                  type="text"
+                  value={fromName}
+                  onChange={(e) => setFromName(e.target.value)}
+                  placeholder="Your Name"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-[#00459c] focus:bg-white transition-colors"
+                />
+              </div>
 
-      {/* EMAIL CLIENT SETUP GUIDES */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Email Client Setup Guides</h2>
-            <p className="text-sm text-slate-500 mt-1">Step-by-step instructions to configure your email on any device or application.</p>
+              {setupError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3">{setupError}</div>
+              )}
+
+              <button
+                type="submit"
+                disabled={setupBusy || !email || !password}
+                className="w-full bg-[#00459c] hover:bg-[#003882] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm py-3 transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                {setupBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                Connect Email
+              </button>
+            </form>
+
+            <div className="bg-blue-50 border border-blue-100 p-4 mt-6 text-xs text-blue-800 space-y-1">
+              <p className="font-bold">How to get a Gmail App Password:</p>
+              <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
+                <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" className="underline font-bold">Google App Passwords</a></li>
+                <li>Enable 2-Step Verification if not already enabled</li>
+                <li>Select <strong>Mail</strong> and <strong>Other</strong>, name it "DigiWise"</li>
+                <li>Click Generate and copy the 16-character password</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ====== GMAIL-LIKE INTERFACE ======
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Top Bar */}
+      <header className="h-14 border-b border-slate-200 flex items-center gap-4 px-4 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-[#00459c] flex items-center justify-center">
+            <Mail className="w-4.5 h-4.5 text-white" />
+          </div>
+          <span className="text-sm font-bold text-slate-800 hidden sm:block">DigiWise Mail</span>
+        </div>
+
+        {/* Search */}
+        <div className="flex-1 max-w-xl mx-auto">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search mail"
+              className="w-full bg-slate-100 hover:bg-slate-50 focus:bg-white border border-transparent focus:border-slate-200 pl-10 pr-4 py-2 text-sm outline-none transition-colors"
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3">
-          {EMAIL_CLIENTS.map((client) => {
-            const isExpanded = expandedGuide === client.id;
-            return (
-              <div key={client.id} className={`${card} overflow-hidden`}>
-                <button
-                  onClick={() => setExpandedGuide(isExpanded ? null : client.id)}
-                  className="w-full flex items-center gap-4 p-5 text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
-                >
-                  <div className="w-10 h-10 bg-[#00459c]/10 text-[#00459c] flex items-center justify-center flex-shrink-0">
-                    {client.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-slate-900 text-sm">{client.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5 truncate">{client.description}</div>
-                  </div>
-                  {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-slate-400 flex-shrink-0" />}
+        {/* User + Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setView('inbox')}
+            className={`p-2 rounded-full transition-colors cursor-pointer ${view === 'inbox' ? 'bg-[#00459c]/10 text-[#00459c]' : 'text-slate-500 hover:bg-slate-100'}`}
+            title="Inbox"
+          >
+            <Inbox className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setView('sent')}
+            className={`p-2 rounded-full transition-colors cursor-pointer ${view === 'sent' ? 'bg-[#00459c]/10 text-[#00459c]' : 'text-slate-500 hover:bg-slate-100'}`}
+            title="Sent"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-slate-100 rounded-full transition-colors cursor-pointer" title="Disconnect">
+            <LogOut className="w-4.5 h-4.5" />
+          </button>
+          <div className="w-8 h-8 bg-[#00459c] text-white flex items-center justify-center text-xs font-bold rounded-full cursor-default" title={email}>
+            {getInitials(email)}
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-60 border-r border-slate-200 shrink-0 flex flex-col">
+          <div className="p-4">
+            <button
+              onClick={() => { setView('compose'); setSelected(null); setComposeTo(''); setComposeSubject(''); setComposeBody(''); }}
+              className="w-full flex items-center justify-center gap-2 bg-[#00459c] hover:bg-[#003882] text-white font-bold text-sm py-2.5 px-4 transition-colors cursor-pointer"
+            >
+              <Compose className="w-4 h-4" /> Compose
+            </button>
+          </div>
+
+          <nav className="flex-1 px-2 space-y-0.5">
+            <button
+              onClick={() => { setView('inbox'); setSelected(null); }}
+              className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-full transition-colors cursor-pointer ${
+                (view === 'inbox' || (view === 'read' && selected?.folder !== 'sent'))
+                  ? 'bg-[#00459c]/10 text-[#00459c] font-bold'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Inbox className="w-4 h-4" /> Inbox
+            </button>
+            <button
+              onClick={() => { setView('sent'); setSelected(null); }}
+              className={`w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-full transition-colors cursor-pointer ${
+                view === 'sent'
+                  ? 'bg-[#00459c]/10 text-[#00459c] font-bold'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <Send className="w-4 h-4" /> Sent
+            </button>
+          </nav>
+
+          <div className="p-4 border-t border-slate-100">
+            <div className="text-[10px] text-slate-400 truncate" title={email}>{email}</div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {/* Compose View */}
+          {view === 'compose' && (
+            <div className="flex-1 flex flex-col p-6 max-w-2xl mx-auto w-full">
+              <div className="flex items-center gap-3 mb-6">
+                <button onClick={() => setView('inbox')} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <ArrowLeft className="w-5 h-5" />
                 </button>
-
-                {isExpanded && (
-                  <div className="border-t border-slate-200 px-5 py-5 space-y-5 bg-slate-50/30">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Setup Steps</h4>
-                      <ol className="space-y-2">
-                        {client.steps.map((step, idx) => (
-                          <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-600">
-                            <span className="w-5 h-5 bg-[#00459c] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{idx + 1}</span>
-                            <span>{step}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Server Settings</h4>
-                      <div className="bg-white border border-slate-200 overflow-hidden">
-                        {client.settings.map((s, idx) => {
-                          const fieldId = `${client.id}-${idx}`;
-                          return (
-                            <div key={idx} className={`flex items-center justify-between px-4 py-2.5 ${idx < client.settings.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                              <span className="text-[11px] text-slate-500 font-semibold">{s.label}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold text-slate-900">{s.value}</span>
-                                {!s.value.includes('password') && !s.value.includes('Your') && (
-                                  <button
-                                    onClick={() => copyToClipboard(s.value, fieldId)}
-                                    className="text-slate-400 hover:text-[#00459c] transition-colors cursor-pointer p-0.5"
-                                    title="Copy to clipboard"
-                                  >
-                                    {copiedField === fieldId ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <h2 className="text-lg font-bold text-slate-900">New Message</h2>
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* SERVER CONFIG REFERENCE */}
-      <div className={`${card} p-6`}>
-        <div className="flex items-center gap-3 mb-4">
-          <Server className="w-5 h-5 text-[#00459c]" />
-          <h3 className="font-bold text-slate-900 text-sm">Server Configuration Reference</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-slate-50 border border-slate-200 p-4">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Incoming Mail (IMAP)</div>
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between"><span className="text-slate-500">Server</span><span className="font-mono font-bold text-slate-900">mail.digiwisesoftech.com</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Port</span><span className="font-mono font-bold text-slate-900">993</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Encryption</span><span className="font-mono font-bold text-slate-900">SSL/TLS</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Authentication</span><span className="font-mono font-bold text-slate-900">Password</span></div>
+              <div className="space-y-4 flex-1">
+                <div className="border-b border-slate-200">
+                  <input
+                    type="email"
+                    value={composeTo}
+                    onChange={(e) => setComposeTo(e.target.value)}
+                    placeholder="To"
+                    className="w-full py-3 text-sm outline-none"
+                  />
+                </div>
+                <div className="border-b border-slate-200">
+                  <input
+                    type="text"
+                    value={composeSubject}
+                    onChange={(e) => setComposeSubject(e.target.value)}
+                    placeholder="Subject"
+                    className="w-full py-3 text-sm outline-none"
+                  />
+                </div>
+                <textarea
+                  value={composeBody}
+                  onChange={(e) => setComposeBody(e.target.value)}
+                  placeholder="Write your message..."
+                  className="w-full flex-1 min-h-[300px] text-sm outline-none resize-none leading-relaxed"
+                />
+              </div>
+
+              {sendResult && (
+                <div className={`px-4 py-3 text-xs font-semibold mb-4 ${
+                  sendResult.type === 'success'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                    : 'bg-rose-50 border border-rose-200 text-rose-700'
+                }`}>
+                  {sendResult.message}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+                <button
+                  onClick={handleSend}
+                  disabled={sending || !composeTo || !composeSubject || !composeBody}
+                  className="bg-[#00459c] hover:bg-[#003882] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm px-6 py-2.5 transition-colors cursor-pointer flex items-center gap-2"
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send
+                </button>
+                <button
+                  onClick={() => setView('inbox')}
+                  className="text-slate-500 hover:text-slate-700 text-sm font-medium cursor-pointer px-3 py-2.5"
+                >
+                  Discard
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="bg-slate-50 border border-slate-200 p-4">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Outgoing Mail (SMTP)</div>
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between"><span className="text-slate-500">Server</span><span className="font-mono font-bold text-slate-900">mail.digiwisesoftech.com</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Port</span><span className="font-mono font-bold text-slate-900">465</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Encryption</span><span className="font-mono font-bold text-slate-900">SSL/TLS</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Authentication</span><span className="font-mono font-bold text-slate-900">Password</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Requires Auth</span><span className="font-mono font-bold text-slate-900">Yes</span></div>
+          )}
+
+          {/* Read Message View */}
+          {view === 'read' && selected && (
+            <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto w-full">
+              <button
+                onClick={() => { setView(selected.folder === 'sent' ? 'sent' : 'inbox'); setSelected(null); }}
+                className="flex items-center gap-1.5 text-sm text-[#00459c] hover:underline cursor-pointer mb-6"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+
+              <h1 className="text-xl font-bold text-slate-900 mb-4">{selected.subject}</h1>
+
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                <div className={`w-10 h-10 ${getAvatarColor(selected.from)} text-white flex items-center justify-center text-xs font-bold rounded-full`}>
+                  {getInitials(selected.from)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-slate-900">{selected.from}</div>
+                  <div className="text-xs text-slate-500">to {selected.to || email}</div>
+                </div>
+                <div className="text-xs text-slate-400">{formatDate(selected.date || selected.createdAt)}</div>
+              </div>
+
+              <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed min-h-[200px]">
+                {selected.body}
+              </div>
+
+              <div className="flex gap-2 mt-8 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    setView('compose');
+                    setComposeTo(selected.from);
+                    setComposeSubject(`Re: ${selected.subject}`);
+                    setComposeBody(`\n\n--- On ${formatDate(selected.date || selected.createdAt)}, ${selected.from} wrote:\n\n${selected.body}`);
+                  }}
+                  className="flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-sm px-4 py-2 transition-colors cursor-pointer"
+                >
+                  <Reply className="w-4 h-4" /> Reply
+                </button>
+                <button
+                  onClick={() => handleDelete(selected.id)}
+                  className="flex items-center gap-1.5 border border-rose-200 hover:bg-rose-50 text-rose-600 font-medium text-sm px-4 py-2 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
+          )}
 
-      {/* WEBMAIL PORTAL */}
-      <div className="bg-slate-900 text-white p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
-        <div className="max-w-xl">
-          <div className="flex items-center gap-1.5 text-[#00c0ff] font-bold text-xs uppercase tracking-wider mb-2">
-            <ExternalLink className="w-4 h-4" /> Secure Webmail Portal
-          </div>
-          <h3 className="text-xl font-bold tracking-tight">Access Secure DigiWise Webmail</h3>
-          <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-            Sign in to your corporate inbox securely using our browser-based Webmail application. Fully supports encrypted key authorization and offline message caching.
-          </p>
-        </div>
-        <a
-          href="https://webmail.digiwisesoftech.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-white text-slate-900 font-extrabold text-xs uppercase tracking-wider px-6 py-3 hover:bg-slate-100 transition-colors cursor-pointer whitespace-nowrap"
-        >
-          Open Webmail Portal
-        </a>
-      </div>
-      </>)}
+          {/* Message List (Inbox / Sent) */}
+          {(view === 'inbox' || view === 'sent') && (
+            <div className="flex-1 overflow-y-auto">
+              {/* Toolbar */}
+              <div className="flex items-center gap-3 px-6 py-2 border-b border-slate-100">
+                <button
+                  onClick={() => loadMessages(view)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                  title="Refresh"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+                <span className="text-xs text-slate-400">{filtered.length} messages</span>
+              </div>
 
+              {/* Messages */}
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#00459c]" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="w-16 h-16 bg-slate-100 flex items-center justify-center mb-4 rounded-full">
+                    <Mail className="w-7 h-7 text-slate-300" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-500">
+                    {search ? 'No messages match your search' : view === 'inbox' ? 'No messages in inbox' : 'No sent messages'}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  {filtered.map((msg) => (
+                    <div
+                      key={msg.id}
+                      onClick={() => openMessage(msg)}
+                      className="flex items-center gap-4 px-6 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors group"
+                    >
+                      <div className={`w-9 h-9 ${getAvatarColor(msg.from)} text-white flex items-center justify-center text-[10px] font-bold rounded-full shrink-0`}>
+                        {getInitials(msg.from)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 truncate">
+                            {view === 'sent' ? `To: ${msg.to}` : msg.from}
+                          </span>
+                          <span className="text-xs text-slate-400 shrink-0">
+                            {formatDate(msg.date || msg.createdAt)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-slate-500 truncate">{msg.subject}</div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(msg.id); }}
+                        className="p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
-
