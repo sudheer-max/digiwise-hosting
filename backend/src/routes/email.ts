@@ -858,6 +858,54 @@ export function emailRoutes(app: FastifyInstance, _opts: any, done: () => void) 
     return EMAIL_HOST_PLANS;
   });
 
+  // Admin direct activate (skip Razorpay)
+  app.post('/api/email/hosting/admin-activate', async (request: any, reply: any) => {
+    const { plan, billing } = request.body as any;
+
+    if (!plan || !billing) {
+      return reply.status(400).send({ error: 'Plan and billing are required' });
+    }
+
+    const planDef = EMAIL_HOST_PLANS[plan];
+    if (!planDef) {
+      return reply.status(400).send({ error: 'Invalid plan' });
+    }
+
+    const token = request.headers['authorization']?.replace('Bearer ', '');
+    if (!token) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+
+    let userId: string;
+    let role: string;
+    try {
+      const decoded = request.server.jwt.verify(token) as any;
+      userId = decoded.id;
+      role = decoded.role;
+    } catch {
+      return reply.status(401).send({ error: 'Invalid token' });
+    }
+
+    if (role !== 'admin') {
+      return reply.status(403).send({ error: 'Admin access required' });
+    }
+
+    const price = billing === 'yearly' ? planDef.yearlyPrice : planDef.monthlyPrice;
+    const months = billing === 'yearly' ? 12 : 1;
+
+    console.log(`[Email Hosting] Admin direct activate: ${userId} activated ${planDef.name} (${billing}) for ₹${price * months}`);
+
+    return {
+      success: true,
+      plan: planDef.name,
+      billing,
+      amount: price * months,
+      mailboxes: planDef.mailboxes,
+      storage: planDef.storage,
+      domains: planDef.domains,
+    };
+  });
+
   // ==================== EMAIL HOSTING TRIAL ====================
 
   const TRIAL_DAYS = 14;

@@ -565,6 +565,13 @@ class ApiClient {
     });
   }
 
+  adminActivateEmailHosting(plan: string, billing: string) {
+    return this.request('/email/hosting/admin-activate', {
+      method: 'POST',
+      body: JSON.stringify({ plan, billing }),
+    });
+  }
+
   verifyEmailHostPayment(data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string; plan: string; billing: string }) {
     return this.emailRequest('/email/hosting/verify', {
       method: 'POST',

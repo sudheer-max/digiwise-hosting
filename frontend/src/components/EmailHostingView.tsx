@@ -128,7 +128,7 @@ const EMAIL_PLANS = [
 
 export default function EmailHostingView() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAdmin } = useAuth();
   const [billing, setBilling] = useState<Billing>('yearly');
   const [selectedPlan, setSelectedPlan] = useState<typeof EMAIL_PLANS[0] | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -175,6 +175,15 @@ export default function EmailHostingView() {
     setError('');
 
     try {
+      if (isAdmin) {
+        const result = await api.adminActivateEmailHosting(plan.key, billing);
+        if (result?.success) {
+          router.push('/email?purchase=success');
+        }
+        setProcessing(false);
+        return;
+      }
+
       const cfg = await api.getPaymentConfig();
       const order = await api.emailHostCheckout(plan.key, billing);
 
@@ -435,7 +444,7 @@ export default function EmailHostingView() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
-                      Get Started
+                      {isAdmin ? 'Activate' : 'Get Started'}
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
