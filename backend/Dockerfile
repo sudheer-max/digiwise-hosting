@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY prisma ./prisma
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 RUN npx prisma generate
 COPY tsconfig.json ./
 COPY src ./src
@@ -16,8 +17,9 @@ RUN apt-get update -y && apt-get install -y openssl curl && rm -rf /var/lib/apt/
     && chmod +x kubectl && mv kubectl /usr/local/bin/kubectl
 COPY package*.json ./
 RUN npm install --omit=dev
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY prisma ./prisma
-RUN npx prisma generate
 COPY --from=builder /app/dist ./dist
 EXPOSE 4000
 CMD ["node", "dist/index.js"]
