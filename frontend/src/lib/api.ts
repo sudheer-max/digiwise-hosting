@@ -436,65 +436,65 @@ class ApiClient {
   }
 
   checkEmailSession() {
-    return this.emailRequest('/api/email/session');
+    return this.emailRequest('/email/session');
   }
 
   deleteEmailSession() {
-    return this.emailRequest('/api/email/session', { method: 'DELETE' }).then((r) => {
+    return this.emailRequest('/email/session', { method: 'DELETE' }).then((r) => {
       this.clearEmailToken();
       return r;
     });
   }
 
   sendEmail(to: string, subject: string, body: string, html?: string, cc?: string, bcc?: string, attachments?: { id: string; name: string; mimeType: string }[]) {
-    return this.emailRequest('/api/email/send', {
+    return this.emailRequest('/email/send', {
       method: 'POST',
       body: JSON.stringify({ to, subject, body, html, cc, bcc, attachments }),
     });
   }
 
   listInbox() {
-    return this.emailRequest('/api/email/inbox');
+    return this.emailRequest('/email/inbox');
   }
 
   listSent() {
-    return this.emailRequest('/api/email/sent');
+    return this.emailRequest('/email/sent');
   }
 
   getEmailMessage(id: string) {
-    return this.emailRequest(`/api/email/messages/${id}`);
+    return this.emailRequest(`/email/messages/${id}`);
   }
 
   deleteEmailMessage(id: string) {
-    return this.emailRequest(`/api/email/messages/${id}`, { method: 'DELETE' });
+    return this.emailRequest(`/email/messages/${id}`, { method: 'DELETE' });
   }
 
   // === EMAIL ACCOUNTS ===
 
   getEmailAccounts() {
-    return this.emailRequest('/api/email/accounts');
+    return this.emailRequest('/email/accounts');
   }
 
   getEmailAccount(id: string) {
-    return this.emailRequest(`/api/email/accounts/${id}`);
+    return this.emailRequest(`/email/accounts/${id}`);
   }
 
   createEmailAccount(account: { email: string; provider: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number; username?: string; password: string; fromName?: string }) {
-    return this.emailRequest('/api/email/accounts', {
+    return this.emailRequest('/email/accounts', {
       method: 'POST',
       body: JSON.stringify(account),
     });
   }
 
   updateEmailAccount(id: string, data: Record<string, any>) {
-    return this.emailRequest(`/api/email/accounts/${id}`, {
+    return this.emailRequest(`/email/accounts/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   deleteEmailAccount(id: string) {
-    return this.emailRequest(`/api/email/accounts/${id}`, { method: 'DELETE' });
+    return this.emailRequest(`/email/accounts/${id}`, { method: 'DELETE' });
   }
 
   // === EMAIL ATTACHMENTS ===
@@ -522,35 +522,35 @@ class ApiClient {
   }
 
   deleteEmailAttachment(id: string) {
-    return this.emailRequest(`/api/email/attachments/${id}`, { method: 'DELETE' });
+    return this.emailRequest(`/email/attachments/${id}`, { method: 'DELETE' });
   }
 
   // === EMAIL TEMPLATES ===
 
   getEmailTemplates() {
-    return this.emailRequest('/api/email/templates');
+    return this.emailRequest('/email/templates');
   }
 
   createEmailTemplate(template: { name: string; subject: string; body: string; html?: string }) {
-    return this.emailRequest('/api/email/templates', {
+    return this.emailRequest('/email/templates', {
       method: 'POST',
       body: JSON.stringify(template),
     });
   }
 
   updateEmailTemplate(id: string, data: Record<string, any>) {
-    return this.emailRequest(`/api/email/templates/${id}`, {
+    return this.emailRequest(`/email/templates/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   deleteEmailTemplate(id: string) {
-    return this.emailRequest(`/api/email/templates/${id}`, { method: 'DELETE' });
+    return this.emailRequest(`/email/templates/${id}`, { method: 'DELETE' });
   }
 
   sendEmailWithTemplate(to: string, templateId: string, variables?: Record<string, string>) {
-    return this.emailRequest('/api/email/send/template', {
+    return this.emailRequest('/email/send/template', {
       method: 'POST',
       body: JSON.stringify({ to, templateId, variables }),
     });
@@ -559,35 +559,35 @@ class ApiClient {
   // === EMAIL HOSTING PURCHASE ===
 
   emailHostCheckout(plan: string, billing: string) {
-    return this.emailRequest('/api/email/hosting/checkout', {
+    return this.emailRequest('/email/hosting/checkout', {
       method: 'POST',
       body: JSON.stringify({ plan, billing }),
     });
   }
 
   verifyEmailHostPayment(data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string; plan: string; billing: string }) {
-    return this.emailRequest('/api/email/hosting/verify', {
+    return this.emailRequest('/email/hosting/verify', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   getEmailHostPlans() {
-    return this.emailRequest('/api/email/hosting/plans');
+    return this.emailRequest('/email/hosting/plans');
   }
 
   // === EMAIL HOSTING TRIAL ===
 
   getEmailTrialStatus() {
-    return this.emailRequest('/api/email/trial');
+    return this.emailRequest('/email/trial');
   }
 
   startEmailTrial() {
-    return this.emailRequest('/api/email/trial/start', { method: 'POST' });
+    return this.emailRequest('/email/trial/start', { method: 'POST' });
   }
 
   createTrialEmailAccount(email: string, password: string) {
-    return this.emailRequest('/api/email/trial/create', {
+    return this.emailRequest('/email/trial/create', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
