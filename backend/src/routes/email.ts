@@ -115,7 +115,7 @@ export function emailRoutes(app: FastifyInstance, _opts: any, done: () => void) 
     if (!s) return reply.status(401).send({ error: 'Session expired' });
 
     try {
-      const ImapFlow = (await import('imapflow')).default;
+      const ImapFlow = (await import('imapflow') as any).ImapFlow;
       const client = new ImapFlow({
         host: 'imap.gmail.com',
         port: 993,
@@ -197,7 +197,7 @@ export function emailRoutes(app: FastifyInstance, _opts: any, done: () => void) 
 
     // Try fetching from IMAP
     try {
-      const ImapFlow = (await import('imapflow')).default;
+      const ImapFlow = (await import('imapflow') as any).ImapFlow;
       const client = new ImapFlow({
         host: 'imap.gmail.com',
         port: 993,
