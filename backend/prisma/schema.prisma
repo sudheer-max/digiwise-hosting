@@ -27,6 +27,7 @@ model User {
   projects Project[]
   meters   UsageMeter[]
   auditLogs AuditLog[]
+  emailConfig EmailConfig?
 
   @@map("users")
 }
@@ -83,4 +84,42 @@ model AuditLog {
   @@index([resource])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model EmailConfig {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  provider  String   @default("gmail")
+  email     String
+  password  String
+  host      String   @default("smtp.gmail.com")
+  port      Int      @default(587)
+  secure    Boolean  @default(true)
+  fromName  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_configs")
+}
+
+model EmailMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  direction String
+  from      String
+  to        String
+  subject   String
+  body      String
+  html      String?
+  read      Boolean  @default(false)
+  folder    String   @default("inbox")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, folder])
+  @@index([userId, direction])
+  @@map("email_messages")
 }

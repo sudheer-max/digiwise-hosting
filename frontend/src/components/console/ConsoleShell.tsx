@@ -8,7 +8,7 @@ import {
   HardDriveDownload, ShieldCheck as ShieldCert, Network as NetworkCluster,
   Bell, KeySquare, Palette, Fingerprint, LayoutTemplate, CreditCard,
   Wallet, Share2, BookOpen, Radio, MessageSquare, Home, UserCog,
-  Cpu, Workflow, Camera, LineChart, Warehouse, ShoppingCart
+  Cpu, Workflow, Camera, LineChart, Warehouse, ShoppingCart, Mail
 } from 'lucide-react';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -58,6 +58,8 @@ import DocsView from './views/DocsView';
 import CentralStationView from './views/CentralStationView';
 import SupportThreadsView from './views/SupportThreadsView';
 import InfrastructureView from './views/InfrastructureView';
+import EmailView from './views/EmailView';
+import EmailSettingsView from './views/EmailSettingsView';
 
 export type Route =  | { name: 'overview' }
   | { name: 'projects' }
@@ -104,7 +106,9 @@ export type Route =  | { name: 'overview' }
   | { name: 'docs' }
   | { name: 'centralStation' }
   | { name: 'supportThreads' }
-  | { name: 'infrastructure' };
+  | { name: 'infrastructure' }
+  | { name: 'email' }
+  | { name: 'emailSettings' };
 
 const ROUTE_TITLES: Record<string, string> = {
   overview: 'Home',
@@ -153,6 +157,8 @@ const ROUTE_TITLES: Record<string, string> = {
   centralStation: 'Central Station',
   supportThreads: 'Support Threads',
   infrastructure: 'Infrastructure',
+  email: 'Email',
+  emailSettings: 'Email Settings',
 };
 
 interface ConsoleData {
@@ -232,7 +238,7 @@ export default function ConsoleShell() {
   const initialRoute = (() => {
     if (typeof window !== 'undefined') {
       const view = new URLSearchParams(window.location.search).get('view');
-      const valid = ['projects', 'templates', 'usage', 'plans', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview'];
+      const valid = ['projects', 'templates', 'usage', 'plans', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview', 'email', 'emailSettings'];
       if (view && valid.includes(view)) return { name: view } as Route;
     }
     return { name: 'overview' } as Route;
@@ -308,6 +314,7 @@ export default function ConsoleShell() {
         { key: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" />, route: { name: 'projects' } as Route, active: route.name === 'projects' || route.name === 'project', count: counts.projects },
         { key: 'applications', label: 'Applications', icon: <Rocket className="w-4 h-4" />, route: { name: 'applications' } as Route, active: route.name === 'applications' || route.name === 'application', count: counts.apps },
         { key: 'databases', label: 'Databases', icon: <Database className="w-4 h-4" />, route: { name: 'databases' } as Route, active: route.name === 'databases' || route.name === 'database', count: counts.dbs },
+        { key: 'email', label: 'Email', icon: <Mail className="w-4 h-4" />, route: { name: 'email' } as Route, active: route.name === 'email' || route.name === 'emailSettings' },
         { key: 'templates', label: 'Templates', icon: <LayoutTemplate className="w-4 h-4" />, route: { name: 'templates' } as Route, active: route.name === 'templates' },
         { key: 'usage', label: 'Usage', icon: <Gauge className="w-4 h-4" />, route: { name: 'usage' } as Route, active: route.name === 'usage' },
         { key: 'people', label: 'People', icon: <Users className="w-4 h-4" />, route: { name: 'people' } as Route, active: route.name === 'people' },
@@ -404,6 +411,8 @@ export default function ConsoleShell() {
       case 'centralStation': return <CentralStationView />;
       case 'supportThreads': return <SupportThreadsView />;
       case 'infrastructure': return <InfrastructureView />;
+      case 'email': return <EmailView />;
+      case 'emailSettings': return <EmailSettingsView />;
       default: return <OverviewView />;
     }
   };

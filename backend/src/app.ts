@@ -30,6 +30,7 @@ import { domainRoutes } from './routes/domains.js';
 import { auditRoutes } from './routes/audit.js';
 import { buildRoutes } from './routes/builds.js';
 import { uploadRoutes } from './routes/upload.js';
+import { emailRoutes } from './routes/email.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -51,7 +52,7 @@ export async function buildApp() {
   await app.register(jwt, { secret: config.jwtSecret });
 
   // Multipart (file uploads)
-  await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB limit
+  await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } }); // 500MB limit
 
   // Global error handler
   app.setErrorHandler((error: any, request, reply) => {
@@ -92,6 +93,7 @@ export async function buildApp() {
         { name: 'Plan', description: 'Subscription plans & usage metering' },
         { name: 'Payment', description: 'Razorpay checkout & billing' },
         { name: 'Admin', description: 'Admin-only platform management' },
+        { name: 'Email', description: 'Gmail SMTP integration — send, receive, inbox, sent' },
         { name: 'Config', description: 'Public configuration' },
         { name: 'Geo', description: 'Geolocation detection' },
         { name: 'System', description: 'Health checks' },
@@ -133,6 +135,7 @@ export async function buildApp() {
   await app.register(adminRoutes);
   await app.register(geoRoutes);
   await app.register(uploadRoutes);
+  await app.register(emailRoutes);
 
   // Scalar API docs
   await app.register(scalar, {

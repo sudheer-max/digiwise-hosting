@@ -816,6 +816,178 @@ export async function databaseRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  // === DATABASE BACKUP (Download) ===
+  app.get('/api/databases/:namespace/:type/:name/backup', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Download a database backup as .sql (PostgreSQL) or .tar.gz (MongoDB)',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const { namespace, type, name } = request.params as { namespace: string; type: string; name: string };
+    if (type !== 'postgresql' && type !== 'mongodb') {
+      return reply.status(400).send({ error: 'Backup only supported for PostgreSQL and MongoDB' });
+    }
+
+    let podName = '';
+    try {
+      if (type === 'postgresql') {
+        const pods = execFileSync('kubectl', ['get', 'pods', '-n', namespace, '-l', `cnpg.io/cluster=${name}`, '-o', 'jsonpath={.items[0].metadata.name}'], { encoding: 'utf-8' }).trim();
+        podName = pods;
+      } else {
+        const pods = execFileSync('kubectl', ['get', 'pods', '-n', namespace, '-o', 'json'], { encoding: 'utf-8' });
+        const parsed = JSON.parse(pods);
+        const mongoPod = parsed.items?.find((p: any) => p.metadata?.name?.startsWith(`${name}-`) && p.status?.phase === 'Running');
+        podName = mongoPod?.metadata?.name || '';
+      }
+    } catch {
+      return reply.status(500).send({ error: 'Could not find database pod' });
+    }
+
+    if (!podName) {
+      return reply.status(404).send({ error: 'No running database pod found' });
+    }
+
+    // Get credentials from secret
+    let username = '', password = '', database = '';
+    try {
+      if (type === 'postgresql') {
+        const secretRaw = execFileSync('kubectl', ['get', 'secret', `${name}-app`, '-n', namespace, '-o', 'json'], { encoding: 'utf-8' });
+        const secret = JSON.parse(secretRaw);
+        username = secret.data['username'] ? Buffer.from(secret.data['username'], 'base64').toString() : name;
+        password = secret.data['password'] ? Buffer.from(secret.data['password'], 'base64').toString() : '';
+        database = secret.data['dbname'] ? Buffer.from(secret.data['dbname'], 'base64').toString() : name;
+      } else {
+        const secretRaw = execFileSync('kubectl', ['get', 'secret', `${name}-credentials`, '-n', namespace, '-o', 'json'], { encoding: 'utf-8' });
+        const secret = JSON.parse(secretRaw);
+        username = secret.data['MONGO_INITDB_ROOT_USERNAME'] ? Buffer.from(secret.data['MONGO_INITDB_ROOT_USERNAME'], 'base64').toString() : 'mongodb';
+        password = secret.data['MONGO_INITDB_ROOT_PASSWORD'] ? Buffer.from(secret.data['MONGO_INITDB_ROOT_PASSWORD'], 'base64').toString() : '';
+      }
+    } catch {
+      // fallback
+    }
+
+    try {
+      if (type === 'postgresql') {
+        // pg_dump to stdout, stream as .sql file
+        const dumpScript = `PGPASSWORD='${password}' pg_dump --no-owner --no-acl -h 127.0.0.1 -p 5432 -U ${username} ${database}`;
+        const sqlDump = execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript], {
+          encoding: 'utf-8',
+          timeout: 300000,
+        });
+        reply.header('Content-Type', 'application/sql');
+        reply.header('Content-Disposition', `attachment; filename="${name}-backup.sql"`);
+        return reply.send(sqlDump);
+      } else {
+        // mongodump, tar it, stream as .tar.gz
+        const dumpScript = `mongodump --uri="mongodb://${username}:${password}@127.0.0.1:27017/?authSource=admin" --archive --gzip --db ${name}`;
+        const dumpBuffer = execFileSync('kubectl', ['exec', '-n', namespace, podName, '--', 'bash', '-c', dumpScript], {
+          timeout: 300000,
+        });
+        reply.header('Content-Type', 'application/gzip');
+        reply.header('Content-Disposition', `attachment; filename="${name}-backup.tar.gz"`);
+        return reply.send(dumpBuffer);
+      }
+    } catch (err: any) {
+      return reply.status(500).send({ error: `Backup failed: ${err.message?.substring(0, 500)}` });
+    }
+  });
+
+  // === DATABASE IMPORT (Upload File) ===
+  app.post('/api/databases/:namespace/:type/:name/import', {
+    schema: {
+      tags: ['Databases'],
+      description: 'Import a database from uploaded .sql or .tar.gz file',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const { namespace, type, name } = request.params as { namespace: string; type: string; name: string };
+    if (type !== 'postgresql' && type !== 'mongodb') {
+      return reply.status(400).send({ error: 'Import only supported for PostgreSQL and MongoDB' });
+    }
+
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: 'No file uploaded' });
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of data.file) {
+      chunks.push(chunk);
+    }
+    const fileBuffer = Buffer.concat(chunks);
+    const filename = data.filename || '';
+
+    // Find the pod
+    let podName = '';
+    try {
+      if (type === 'postgresql') {
+        const pods = execFileSync('kubectl', ['get', 'pods', '-n', namespace, '-l', `cnpg.io/cluster=${name}`, '-o', 'jsonpath={.items[0].metadata.name}'], { encoding: 'utf-8' }).trim();
+        podName = pods;
+      } else {
+        const pods = execFileSync('kubectl', ['get', 'pods', '-n', namespace, '-o', 'json'], { encoding: 'utf-8' });
+        const parsed = JSON.parse(pods);
+        const mongoPod = parsed.items?.find((p: any) => p.metadata?.name?.startsWith(`${name}-`) && p.status?.phase === 'Running');
+        podName = mongoPod?.metadata?.name || '';
+      }
+    } catch {
+      return reply.status(500).send({ error: 'Could not find database pod' });
+    }
+
+    if (!podName) {
+      return reply.status(404).send({ error: 'No running database pod found' });
+    }
+
+    // Get credentials
+    let username = '', password = '', database = name;
+    try {
+      if (type === 'postgresql') {
+        const secretRaw = execFileSync('kubectl', ['get', 'secret', `${name}-app`, '-n', namespace, '-o', 'json'], { encoding: 'utf-8' });
+        const secret = JSON.parse(secretRaw);
+        username = secret.data['username'] ? Buffer.from(secret.data['username'], 'base64').toString() : name;
+        password = secret.data['password'] ? Buffer.from(secret.data['password'], 'base64').toString() : '';
+        database = secret.data['dbname'] ? Buffer.from(secret.data['dbname'], 'base64').toString() : name;
+      } else {
+        const secretRaw = execFileSync('kubectl', ['get', 'secret', `${name}-credentials`, '-n', namespace, '-o', 'json'], { encoding: 'utf-8' });
+        const secret = JSON.parse(secretRaw);
+        username = secret.data['MONGO_INITDB_ROOT_USERNAME'] ? Buffer.from(secret.data['MONGO_INITDB_ROOT_USERNAME'], 'base64').toString() : 'mongodb';
+        password = secret.data['MONGO_INITDB_ROOT_PASSWORD'] ? Buffer.from(secret.data['MONGO_INITDB_ROOT_PASSWORD'], 'base64').toString() : '';
+      }
+    } catch {
+      // fallback
+    }
+
+    try {
+      if (type === 'postgresql') {
+        if (!filename.endsWith('.sql')) {
+          return reply.status(400).send({ error: 'PostgreSQL import requires a .sql file' });
+        }
+        // Pipe .sql file to psql via kubectl exec
+        const importScript = `PGPASSWORD='${password}' psql -h 127.0.0.1 -p 5432 -U ${username} -d ${database}`;
+        execFileSync('kubectl', ['exec', '-i', '-n', namespace, podName, '--', 'bash', '-c', importScript], {
+          input: fileBuffer,
+          timeout: 600000,
+        });
+        return reply.send({ success: true, message: 'SQL file imported successfully' });
+      } else {
+        if (!filename.endsWith('.gz') && !filename.endsWith('.tar.gz')) {
+          return reply.status(400).send({ error: 'MongoDB import requires a .tar.gz or .gz file' });
+        }
+        // mongorestore from uploaded .gz archive
+        const importScript = `mongorestore --uri="mongodb://${username}:${password}@127.0.0.1:27017/?authSource=admin" --archive --gzip --db ${name} --drop`;
+        execFileSync('kubectl', ['exec', '-i', '-n', namespace, podName, '--', 'bash', '-c', importScript], {
+          input: fileBuffer,
+          timeout: 600000,
+        });
+        return reply.send({ success: true, message: 'MongoDB dump imported successfully' });
+      }
+    } catch (err: any) {
+      return reply.status(500).send({ error: `Import failed: ${err.message?.substring(0, 500)}` });
+    }
+  });
 }
 
 // Helper functions for creating database instances

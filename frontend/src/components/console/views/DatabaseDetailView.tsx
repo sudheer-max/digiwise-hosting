@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock, ArrowDownToLine, Wifi, WifiOff } from 'lucide-react';
+import { Database, Trash2, Terminal, KeyRound, Loader2, HardDrive, RefreshCw, Plug, ExternalLink, Copy, Check, Eye, EyeOff, ChevronRight, Globe, Lock, ArrowDownToLine, ArrowUpFromLine, Download, Upload, Wifi, WifiOff } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
@@ -14,7 +14,7 @@ const DB_INFO: Record<string, { label: string; icon: string; color: string }> = 
   redis: { label: 'Redis', icon: '🔴', color: '#DC382D' },
 };
 
-type Tab = 'variables' | 'connect' | 'credentials' | 'browse' | 'logs' | 'advanced' | 'migrate';
+type Tab = 'variables' | 'connect' | 'credentials' | 'browse' | 'logs' | 'advanced' | 'migrate' | 'backup';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -76,6 +76,10 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
   const [migrateBusy, setMigrateBusy] = useState(false);
   const [migrateResult, setMigrateResult] = useState<{ success: boolean; message: string } | null>(null);
   const [migrateError, setMigrateError] = useState('');
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [importError, setImportError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -158,6 +162,41 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     }
   };
 
+  const doBackup = async () => {
+    setBackupBusy(true);
+    try {
+      const response = await api.backupDatabase(namespace, type, dbName);
+      const blob = await response.blob();
+      const ext = type === 'postgresql' ? 'sql' : 'tar.gz';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dbName}-backup.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`Backup failed: ${err.message}`);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const doImport = async (file: File) => {
+    setImportBusy(true);
+    setImportResult(null);
+    setImportError('');
+    try {
+      const res: any = await api.importDatabase(namespace, type, dbName, file);
+      setImportResult({ success: true, message: res?.message || 'Import completed successfully' });
+    } catch (err: any) {
+      setImportError(err.message || 'Import failed');
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
   if (loading) return <Loader label={`Loading ${info.label}...`} />;
   if (!db && !vars) return <ErrorBanner message={error || 'Database not found'} onRetry={load} />;
 
@@ -202,7 +241,10 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
     { id: 'credentials', label: 'Credentials', icon: <Lock className="w-3.5 h-3.5" /> },
     { id: 'browse', label: 'Browse Data', icon: <Database className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
-    ...(type === 'mongodb' || type === 'postgresql' ? [{ id: 'migrate' as Tab, label: 'Migrate Data', icon: <ArrowDownToLine className="w-3.5 h-3.5" /> }] : []),
+    ...(type === 'mongodb' || type === 'postgresql' ? [
+      { id: 'migrate' as Tab, label: 'Migrate Data', icon: <ArrowDownToLine className="w-3.5 h-3.5" /> },
+      { id: 'backup' as Tab, label: 'Backup / Import', icon: <Download className="w-3.5 h-3.5" /> },
+    ] : []),
     { id: 'advanced', label: 'Advanced', icon: <Database className="w-3.5 h-3.5" /> },
   ];
 
@@ -695,6 +737,112 @@ export default function DatabaseDetailView({ type, namespace, dbName }: { type: 
             <p className="text-[10px] text-slate-400 mt-3">
               The source database must be reachable from the internet. For Railway, grab the connection URI from your service Variables.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Backup / Import Tab */}
+      {tab === 'backup' && (type === 'mongodb' || type === 'postgresql') && (
+        <div className="space-y-6">
+          {/* Download Backup */}
+          <div className="bg-white border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Download Backup</h3>
+                <p className="text-[11px] text-slate-400">Export all {type === 'postgresql' ? 'tables and data as a .sql file' : 'collections as a .tar.gz dump'}.</p>
+              </div>
+            </div>
+            <button
+              onClick={doBackup}
+              disabled={backupBusy}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-5 py-2.5 transition-colors cursor-pointer flex items-center gap-2"
+            >
+              {backupBusy ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating backup...</>
+              ) : (
+                <><Download className="w-3.5 h-3.5" /> Download {type === 'postgresql' ? '.sql' : '.tar.gz'} Backup</>
+              )}
+            </button>
+          </div>
+
+          {/* Upload Import */}
+          <div className="bg-white border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-[#00459c]/10 text-[#00459c] flex items-center justify-center">
+                <Upload className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Import from File</h3>
+                <p className="text-[11px] text-slate-400">Upload a {type === 'postgresql' ? '.sql' : '.tar.gz or .gz'} file to restore into this database.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) doImport(file);
+                }}
+                className="border-2 border-dashed border-slate-200 hover:border-[#00459c] p-8 text-center transition-colors"
+              >
+                <Upload className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                <p className="text-xs text-slate-500 mb-3">Drag and drop your file here, or click to browse</p>
+                <label className="inline-flex items-center gap-2 bg-[#00459c] hover:bg-[#003577] text-white font-bold text-xs px-4 py-2.5 transition-colors cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" /> Choose File
+                  <input
+                    type="file"
+                    accept={type === 'postgresql' ? '.sql' : '.gz,.tar.gz'}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) doImport(file);
+                    }}
+                  />
+                </label>
+                <p className="text-[10px] text-slate-400 mt-2">
+                  Accepted: {type === 'postgresql' ? '.sql files up to 500MB' : '.tar.gz or .gz files up to 500MB'}
+                </p>
+              </div>
+
+              {importBusy && (
+                <div className="bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-4 py-3 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing... this may take a while for large files.
+                </div>
+              )}
+
+              {importResult && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-4 py-3">
+                  {importResult.message}
+                </div>
+              )}
+
+              {importError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3">
+                  {importError}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-700 mt-4">
+              <strong>Warning:</strong> Importing will overwrite existing data. Consider creating a backup first.
+            </div>
+          </div>
+
+          {/* How it works */}
+          <div className="bg-white border border-slate-200 shadow-sm p-5">
+            <h3 className="text-sm font-bold text-slate-900 mb-3">How Backup & Import Works</h3>
+            <ul className="text-xs text-slate-500 space-y-2 list-disc list-inside">
+              <li><strong>Backup:</strong> Runs {type === 'postgresql' ? 'pg_dump' : 'mongodump'} inside the database pod and streams the result as a downloadable file</li>
+              <li><strong>Import:</strong> Uploads your file and pipes it directly into {type === 'postgresql' ? 'psql' : 'mongorestore'} inside the database pod</li>
+              <li>No temporary files are stored on the server</li>
+              <li>Maximum file size: 500MB</li>
+            </ul>
           </div>
         </div>
       )}

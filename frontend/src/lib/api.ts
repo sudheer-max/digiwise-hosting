@@ -363,6 +363,82 @@ class ApiClient {
     }, 600000);
   }
 
+  // === DATABASE BACKUP/IMPORT ===
+
+  backupDatabase(namespace: string, type: string, name: string) {
+    return fetch(`${API_BASE}/api/databases/${namespace}/${type}/${name}/backup`, {
+      headers: { 'Authorization': `Bearer ${this.getToken()}` },
+    }).then(async (r) => {
+      if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Backup failed'); }
+      return r;
+    });
+  }
+
+  importDatabase(namespace: string, type: string, name: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetch(`${API_BASE}/api/databases/${namespace}/${type}/${name}/import`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${this.getToken()}` },
+      body: formData,
+    }).then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Import failed');
+      return data;
+    });
+  }
+
+  // === EMAIL ===
+
+  getEmailConfig() {
+    return this.request('/email/config');
+  }
+
+  saveEmailConfig(config: { email: string; password: string; host?: string; port?: number; secure?: boolean; fromName?: string }) {
+    return this.request('/email/config', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  deleteEmailConfig() {
+    return this.request('/email/config', { method: 'DELETE' });
+  }
+
+  testEmail() {
+    return this.request('/email/test', { method: 'POST' });
+  }
+
+  sendEmail(to: string, subject: string, body: string) {
+    return this.request('/email/send', {
+      method: 'POST',
+      body: JSON.stringify({ to, subject, body }),
+    });
+  }
+
+  listInbox() {
+    return this.request('/email/inbox');
+  }
+
+  listSent() {
+    return this.request('/email/sent');
+  }
+
+  getEmailMessage(id: string) {
+    return this.request(`/email/messages/${id}`);
+  }
+
+  deleteEmailMessage(id: string) {
+    return this.request(`/email/messages/${id}`, { method: 'DELETE' });
+  }
+
+  markEmailRead(id: string, read: boolean) {
+    return this.request(`/email/messages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ read }),
+    });
+  }
+
   // === GITHUB DEPLOY ===
 
   deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> }) {

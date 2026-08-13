@@ -1,7 +1,38 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
+import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
+
+const prisma = new PrismaClient();
 
 let transporter: nodemailer.Transporter | null = null;
+
+function decrypt(encryptedText: string): string {
+  const key = process.env.JWT_SECRET || 'dev-secret';
+  const hash = crypto.createHash('sha256').update(key).digest();
+  const [ivHex, encrypted] = encryptedText.split(':');
+  const iv = Buffer.from(ivHex, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', hash, iv);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
+export async function getUserTransporter(userId: string): Promise<nodemailer.Transporter | null> {
+  try {
+    const cfg = await prisma.emailConfig.findUnique({ where: { userId } });
+    if (!cfg) return null;
+    const pass = decrypt(cfg.password);
+    return nodemailer.createTransport({
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      auth: { user: cfg.email, pass },
+    });
+  } catch {
+    return null;
+  }
+}
 
 function getTransporter(): nodemailer.Transporter {
   if (transporter) return transporter;
