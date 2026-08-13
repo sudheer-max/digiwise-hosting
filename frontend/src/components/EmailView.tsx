@@ -10,7 +10,11 @@ import api from '../lib/api';
 
 type View = 'setup' | 'inbox' | 'sent' | 'compose' | 'read' | 'accounts' | 'templates';
 
-export default function EmailView() {
+interface EmailViewProps {
+  setupComponent?: React.ReactNode;
+}
+
+export default function EmailView({ setupComponent }: EmailViewProps) {
   const [view, setView] = useState<View>('setup');
   const [configured, setConfigured] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
@@ -253,6 +257,11 @@ export default function EmailView() {
 
   // ====== SETUP SCREEN ======
   if (!configured) {
+    // If a custom setup component is provided, use it
+    if (setupComponent) {
+      return <>{setupComponent}</>;
+    }
+
     return (
       <div className="min-h-screen bg-[#f6f8fc] flex items-center justify-center p-4">
         <div className="w-full max-w-md">
