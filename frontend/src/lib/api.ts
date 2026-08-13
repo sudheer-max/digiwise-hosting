@@ -556,6 +556,26 @@ class ApiClient {
     });
   }
 
+  // === EMAIL HOSTING PURCHASE ===
+
+  emailHostCheckout(plan: string, billing: string) {
+    return this.emailRequest('/api/email/hosting/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan, billing }),
+    });
+  }
+
+  verifyEmailHostPayment(data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string; plan: string; billing: string }) {
+    return this.emailRequest('/api/email/hosting/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getEmailHostPlans() {
+    return this.emailRequest('/api/email/hosting/plans');
+  }
+
   // === GITHUB DEPLOY ===
 
   deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> }) {

@@ -745,6 +745,119 @@ export function emailRoutes(app: FastifyInstance, _opts: any, done: () => void) 
     return { success: true };
   });
 
+  // ==================== EMAIL HOSTING PURCHASE ====================
+
+  const EMAIL_HOST_PLANS: Record<string, { name: string; mailboxes: number; storage: string; domains: number; monthlyPrice: number; yearlyPrice: number }> = {
+    'email-starter': { name: 'Starter', mailboxes: 1, storage: '5 GB', domains: 1, monthlyPrice: 49, yearlyPrice: 39 },
+    'email-pro': { name: 'Professional', mailboxes: 5, storage: '10 GB', domains: 3, monthlyPrice: 199, yearlyPrice: 149 },
+    'email-business': { name: 'Business', mailboxes: 25, storage: '25 GB', domains: 10, monthlyPrice: 499, yearlyPrice: 399 },
+    'email-enterprise': { name: 'Enterprise', mailboxes: 100, storage: '50 GB', domains: 50, monthlyPrice: 999, yearlyPrice: 799 },
+  };
+
+  // Create email hosting order
+  app.post('/api/email/hosting/checkout', async (request: any, reply: any) => {
+    const { plan, billing } = request.body as any;
+    if (!plan || !EMAIL_HOST_PLANS[plan]) {
+      return reply.status(400).send({ error: 'Invalid plan' });
+    }
+
+    const planDef = EMAIL_HOST_PLANS[plan];
+    const price = billing === 'yearly' ? planDef.yearlyPrice : planDef.monthlyPrice;
+    const months = billing === 'yearly' ? 12 : 1;
+    const totalAmount = price * months;
+
+    // Create Razorpay order
+    const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+    const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      return reply.status(500).send({ error: 'Payment not configured' });
+    }
+
+    const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64');
+    const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: totalAmount * 100, // Razorpay uses paise
+        currency: 'INR',
+        receipt: `email-${plan}-${Date.now()}`,
+      }),
+    });
+
+    const order = await orderResponse.json();
+    if (!order.id) {
+      return reply.status(500).send({ error: 'Failed to create order' });
+    }
+
+    return {
+      razorpayOrderId: order.id,
+      amount: totalAmount * 100,
+      currency: 'INR',
+      planName: planDef.name,
+      billing,
+      months,
+    };
+  });
+
+  // Verify email hosting payment
+  app.post('/api/email/hosting/verify', async (request: any, reply: any) => {
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, plan, billing } = request.body as any;
+
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      return reply.status(400).send({ error: 'Missing payment details' });
+    }
+
+    // Verify signature
+    const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
+    const expectedSignature = crypto
+      .createHmac('sha256', razorpayKeySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      return reply.status(400).send({ error: 'Invalid payment signature' });
+    }
+
+    // Get user from JWT or session
+    const token = request.headers['authorization']?.replace('Bearer ', '') || request.headers['x-email-token'];
+    let userId = 'session-' + crypto.createHash('sha256').update('anonymous').digest('hex').slice(0, 16);
+
+    try {
+      if (token && token.startsWith('eyJ')) {
+        const decoded = request.server.jwt.verify(token) as any;
+        userId = decoded.id;
+      }
+    } catch { /* use default userId */ }
+
+    // Store purchase record
+    const planDef = EMAIL_HOST_PLANS[plan];
+    const price = billing === 'yearly' ? planDef.yearlyPrice : planDef.monthlyPrice;
+    const months = billing === 'yearly' ? 12 : 1;
+
+    // TODO: Store in a proper EmailHostingPurchase table
+    // For now, log the purchase
+    console.log(`[Email Hosting] Purchase verified: ${userId} bought ${planDef.name} (${billing}) for ₹${price * months}`);
+
+    return {
+      success: true,
+      plan: planDef.name,
+      billing,
+      amount: price * months,
+      mailboxes: planDef.mailboxes,
+      storage: planDef.storage,
+      domains: planDef.domains,
+    };
+  });
+
+  // Get email hosting plans
+  app.get('/api/email/hosting/plans', async () => {
+    return EMAIL_HOST_PLANS;
+  });
+
   done();
 }
 
