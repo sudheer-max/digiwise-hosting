@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Mail, Inbox, Send, Trash2, ArrowLeft, Plus, Search, Reply, ReplyAll,
   Forward, Star, Archive, RefreshCw, Loader2, Settings, LogOut, ChevronDown,
-  Compose, X, Paperclip
+  PenSquare, X, Paperclip
 } from 'lucide-react';
 import api from '../lib/api';
 
@@ -287,7 +287,7 @@ export default function EmailView() {
               onClick={() => { setView('compose'); setSelected(null); setComposeTo(''); setComposeSubject(''); setComposeBody(''); }}
               className="w-full flex items-center justify-center gap-2 bg-[#00459c] hover:bg-[#003882] text-white font-bold text-sm py-2.5 px-4 transition-colors cursor-pointer"
             >
-              <Compose className="w-4 h-4" /> Compose
+              <PenSquare className="w-4 h-4" /> Compose
             </button>
           </div>
 
