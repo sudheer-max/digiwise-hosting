@@ -4,7 +4,7 @@ COPY package*.json ./
 RUN npm install
 COPY prisma ./prisma
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-RUN npx prisma generate --no-engine 2>/dev/null || npx prisma generate
+RUN npx prisma generate
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
