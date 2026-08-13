@@ -103,6 +103,7 @@ export default function DigiWiseHeader({ cartCount = 0, onNavigate }: HeaderProp
       categoryName: 'Deployments',
       links: [
         { id: 'email', label: 'Business Email', desc: 'Provision secure corporate mailboxes', icon: Mail },
+        { id: 'email/hosting', label: 'Email Hosting', desc: 'Purchase professional email hosting plans', icon: Server },
         { id: 'support', label: 'Priority Support', desc: 'SLA ticket system and live support portal', icon: HelpCircle },
       ]
     }
@@ -490,6 +491,14 @@ export default function DigiWiseHeader({ cartCount = 0, onNavigate }: HeaderProp
                 className="w-full text-left px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-[#00459c]"
               >
                 Business Email
+              </Link>
+
+              <Link
+                href="/email/hosting"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full text-left px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-[#00459c]"
+              >
+                Email Hosting
               </Link>
 
               {onNavigate && (

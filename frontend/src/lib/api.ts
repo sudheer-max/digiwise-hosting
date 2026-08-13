@@ -576,6 +576,23 @@ class ApiClient {
     return this.emailRequest('/api/email/hosting/plans');
   }
 
+  // === EMAIL HOSTING TRIAL ===
+
+  getEmailTrialStatus() {
+    return this.emailRequest('/api/email/trial');
+  }
+
+  startEmailTrial() {
+    return this.emailRequest('/api/email/trial/start', { method: 'POST' });
+  }
+
+  createTrialEmailAccount(email: string, password: string) {
+    return this.emailRequest('/api/email/trial/create', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
   // === GITHUB DEPLOY ===
 
   deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> }) {

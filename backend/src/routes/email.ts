@@ -858,6 +858,170 @@ export function emailRoutes(app: FastifyInstance, _opts: any, done: () => void) 
     return EMAIL_HOST_PLANS;
   });
 
+  // ==================== EMAIL HOSTING TRIAL ====================
+
+  const TRIAL_DAYS = 14;
+  const TRIAL_STORAGE_MB = 256; // 256 MB for trial
+
+  // Check trial status
+  app.get('/api/email/trial', async (request: any, reply: any) => {
+    const s = getSession(request);
+    if (!s) return reply.status(401).send({ error: 'Email session required' });
+
+    const userId = request.user?.id || 'session-' + crypto.createHash('sha256').update(s.email).digest('hex').slice(0, 16);
+
+    // Check if user has an active email hosting plan
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user?.plan && user.plan !== 'trial') {
+      return { hasAccess: true, isTrial: false, plan: user.plan };
+    }
+
+    // Check trial status from email_accounts metadata
+    const accounts = await prisma.emailAccount.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      take: 1,
+    });
+
+    if (accounts.length === 0) {
+      return { hasAccess: false, isTrial: false, trialExpired: false };
+    }
+
+    const firstAccount = accounts[0];
+    const trialStartedAt = firstAccount.createdAt;
+    const trialEndsAt = new Date(trialStartedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const isExpired = now > trialEndsAt;
+    const daysLeft = Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+
+    return {
+      hasAccess: !isExpired,
+      isTrial: true,
+      trialExpired: isExpired,
+      trialStartedAt,
+      trialEndsAt,
+      daysLeft,
+      storageLimit: TRIAL_STORAGE_MB,
+    };
+  });
+
+  // Start email hosting trial (create trial account)
+  app.post('/api/email/trial/start', async (request: any, reply: any) => {
+    const s = getSession(request);
+    if (!s) return reply.status(401).send({ error: 'Email session required' });
+
+    const userId = request.user?.id || 'session-' + crypto.createHash('sha256').update(s.email).digest('hex').slice(0, 16);
+
+    // Check if already has trial
+    const existingAccounts = await prisma.emailAccount.findMany({
+      where: { userId },
+      take: 1,
+    });
+
+    if (existingAccounts.length > 0) {
+      return reply.status(400).send({ error: 'Trial already started. Please purchase a plan to continue.' });
+    }
+
+    // Create trial email account
+    const trialEmail = `trial-${userId.slice(0, 8)}@digiwisesoftech.com`;
+    const trialPassword = crypto.randomBytes(16).toString('hex');
+
+    const account = await prisma.emailAccount.create({
+      data: {
+        userId,
+        email: trialEmail,
+        provider: 'trial',
+        imapHost: 'imap.digiwisesoftech.com',
+        imapPort: 993,
+        smtpHost: 'smtp.digiwisesoftech.com',
+        smtpPort: 587,
+        username: trialEmail,
+        password: encrypt(trialPassword),
+        fromName: 'Trial User',
+        isDefault: true,
+      },
+    });
+
+    return {
+      success: true,
+      account: {
+        ...account,
+        password: trialPassword, // Return plain text password for trial
+      },
+      trial: {
+        daysLeft: TRIAL_DAYS,
+        storageLimit: TRIAL_STORAGE_MB,
+      },
+    };
+  });
+
+  // Create trial email account (for existing trial users)
+  app.post('/api/email/trial/create', async (request: any, reply: any) => {
+    const s = getSession(request);
+    if (!s) return reply.status(401).send({ error: 'Email session required' });
+
+    const { email, password } = request.body as any;
+    if (!email || !password) {
+      return reply.status(400).send({ error: 'Email and password are required' });
+    }
+
+    const userId = request.user?.id || 'session-' + crypto.createHash('sha256').update(s.email).digest('hex').slice(0, 16);
+
+    // Check if trial is active
+    const accounts = await prisma.emailAccount.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+      take: 1,
+    });
+
+    if (accounts.length > 0) {
+      const firstAccount = accounts[0];
+      const trialStartedAt = firstAccount.createdAt;
+      const trialEndsAt = new Date(trialStartedAt.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      if (new Date() > trialEndsAt) {
+        return reply.status(403).send({ error: 'Trial expired. Please purchase a plan.' });
+      }
+    }
+
+    // Create the email account with user's credentials
+    const account = await prisma.emailAccount.create({
+      data: {
+        userId,
+        email,
+        provider: 'gmail',
+        imapHost: 'imap.gmail.com',
+        imapPort: 993,
+        smtpHost: 'smtp.gmail.com',
+        smtpPort: 587,
+        username: email,
+        password: encrypt(password),
+        fromName: '',
+        isDefault: true,
+      },
+    });
+
+    // Create session
+    const token = crypto.randomBytes(32).toString('hex');
+    sessions.set(token, {
+      email,
+      password,
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: true,
+      fromName: '',
+    });
+
+    return {
+      success: true,
+      account: { ...account, password: undefined },
+      token,
+      trial: {
+        daysLeft: TRIAL_DAYS,
+        storageLimit: TRIAL_STORAGE_MB,
+      },
+    };
+  });
+
   done();
 }
 

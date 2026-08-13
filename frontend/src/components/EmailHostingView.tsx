@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Mail, Check, ArrowRight, Shield, Zap, Users, Building2,
-  Globe, ArrowLeft, Loader2, Star, Lock, HardDrive, Send
+  Globe, ArrowLeft, Loader2, Star, Lock, HardDrive, Send, Clock, AlertCircle
 } from 'lucide-react';
 import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -133,6 +133,36 @@ export default function EmailHostingView() {
   const [selectedPlan, setSelectedPlan] = useState<typeof EMAIL_PLANS[0] | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [trialStatus, setTrialStatus] = useState<any>(null);
+  const [startingTrial, setStartingTrial] = useState(false);
+
+  // Check trial status on mount
+  useEffect(() => {
+    if (user) {
+      api.getEmailTrialStatus().then((trial: any) => {
+        setTrialStatus(trial);
+      }).catch(() => {});
+    }
+  }, [user]);
+
+  const handleStartTrial = async () => {
+    if (!user) {
+      router.push('/auth/login?returnTo=/email/hosting');
+      return;
+    }
+
+    setStartingTrial(true);
+    try {
+      const result = await api.startEmailTrial();
+      if (result?.success) {
+        // Redirect to email setup with trial account created
+        router.push('/email?trial=started');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to start trial');
+    }
+    setStartingTrial(false);
+  };
 
   const handlePurchase = async (plan: typeof EMAIL_PLANS[0]) => {
     if (!user) {
@@ -219,6 +249,53 @@ export default function EmailHostingView() {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-12">
+        {/* Trial Banner */}
+        {user && trialStatus && !trialStatus.hasAccess && !trialStatus.trialExpired && (
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6 mb-8 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold mb-1">Start Your 14-Day Free Trial</h3>
+              <p className="text-sm text-emerald-100">Get 256 MB storage, 1 mailbox, and full email access. No credit card required.</p>
+            </div>
+            <button
+              onClick={handleStartTrial}
+              disabled={startingTrial}
+              className="bg-white text-emerald-600 font-bold text-sm px-6 py-3 hover:bg-emerald-50 transition-colors cursor-pointer flex items-center gap-2"
+            >
+              {startingTrial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              Start Free Trial
+            </button>
+          </div>
+        )}
+
+        {/* Trial Active Banner */}
+        {user && trialStatus?.isTrial && trialStatus?.hasAccess && (
+          <div className="bg-amber-50 border border-amber-200 p-4 mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-amber-600" />
+              <div>
+                <div className="text-sm font-bold text-amber-800">Free Trial Active</div>
+                <div className="text-xs text-amber-600">{trialStatus.daysLeft} days left &middot; {trialStatus.storageLimit} MB storage</div>
+              </div>
+            </div>
+            <a href="/email" className="text-xs font-bold text-amber-700 hover:text-amber-900 underline">
+              Go to Email &rarr;
+            </a>
+          </div>
+        )}
+
+        {/* Trial Expired Banner */}
+        {user && trialStatus?.trialExpired && (
+          <div className="bg-rose-50 border border-rose-200 p-4 mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-600" />
+              <div>
+                <div className="text-sm font-bold text-rose-800">Trial Expired</div>
+                <div className="text-xs text-rose-600">Your 14-day trial has ended. Purchase a plan to continue using email hosting.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Hero */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-extrabold text-slate-900 mb-3">Professional Email Hosting</h2>

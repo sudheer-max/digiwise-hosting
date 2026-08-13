@@ -150,6 +150,16 @@ export default function EmailSetupView() {
     api.getEmailAccounts().then((accs: any) => {
       setExistingAccounts(Array.isArray(accs) ? accs : []);
     }).catch(() => {});
+
+    // Check trial status
+    api.getEmailTrialStatus().then((trial: any) => {
+      if (trial?.hasAccess) {
+        // Trial active, can proceed
+      } else if (trial?.trialExpired) {
+        // Trial expired, redirect to purchase
+        router.push('/email/hosting');
+      }
+    }).catch(() => {});
   }, [router]);
 
   const selectProvider = (provider: typeof PROVIDERS[0]) => {
