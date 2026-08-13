@@ -29,6 +29,8 @@ model User {
   auditLogs AuditLog[]
   emailConfig EmailConfig?
   emailMessages EmailMessage[]
+  emailAccounts EmailAccount[]
+  emailTemplates EmailTemplate[]
 
   @@map("users")
 }
@@ -119,8 +121,68 @@ model EmailMessage {
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments EmailAttachment[]
 
   @@index([userId, folder])
   @@index([userId, direction])
   @@map("email_messages")
+}
+
+model EmailAccount {
+  id         String   @id @default(cuid())
+  userId     String
+  email      String
+  provider   String   @default("gmail") // gmail, outlook, custom
+  imapHost   String
+  imapPort   Int      @default(993)
+  smtpHost   String
+  smtpPort   Int      @default(587)
+  username   String
+  password   String   // encrypted
+  fromName   String?
+  isDefault  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, email])
+  @@index([userId])
+  @@map("email_accounts")
+}
+
+model EmailAttachment {
+  id         String   @id @default(cuid())
+  messageId  String?
+  userId     String
+  fileName   String
+  fileSize   Int
+  mimeType   String
+  storageKey String   // MinIO object key
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  message EmailMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([messageId])
+  @@map("email_attachments")
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  subject   String
+  body      String
+  html      String?
+  variables Json?    // array of variable names
+  isSystem  Boolean  @default(false) // pre-built templates
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_templates")
 }

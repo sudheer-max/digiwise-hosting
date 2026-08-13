@@ -446,10 +446,10 @@ class ApiClient {
     });
   }
 
-  sendEmail(to: string, subject: string, body: string) {
+  sendEmail(to: string, subject: string, body: string, html?: string, cc?: string, bcc?: string, attachments?: { id: string; name: string; mimeType: string }[]) {
     return this.emailRequest('/api/email/send', {
       method: 'POST',
-      body: JSON.stringify({ to, subject, body }),
+      body: JSON.stringify({ to, subject, body, html, cc, bcc, attachments }),
     });
   }
 
@@ -467,6 +467,93 @@ class ApiClient {
 
   deleteEmailMessage(id: string) {
     return this.emailRequest(`/api/email/messages/${id}`, { method: 'DELETE' });
+  }
+
+  // === EMAIL ACCOUNTS ===
+
+  getEmailAccounts() {
+    return this.emailRequest('/api/email/accounts');
+  }
+
+  getEmailAccount(id: string) {
+    return this.emailRequest(`/api/email/accounts/${id}`);
+  }
+
+  createEmailAccount(account: { email: string; provider: string; imapHost: string; imapPort: number; smtpHost: string; smtpPort: number; username?: string; password: string; fromName?: string }) {
+    return this.emailRequest('/api/email/accounts', {
+      method: 'POST',
+      body: JSON.stringify(account),
+    });
+  }
+
+  updateEmailAccount(id: string, data: Record<string, any>) {
+    return this.emailRequest(`/api/email/accounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  deleteEmailAccount(id: string) {
+    return this.emailRequest(`/api/email/accounts/${id}`, { method: 'DELETE' });
+  }
+
+  // === EMAIL ATTACHMENTS ===
+
+  async uploadEmailAttachment(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = this.getEmailToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['X-Email-Token'] = token;
+    const r = await fetch(`${API_BASE}/api/email/attachments`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Upload failed'); }
+    return r.json();
+  }
+
+  downloadEmailAttachment(id: string) {
+    const token = this.getEmailToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['X-Email-Token'] = token;
+    return fetch(`${API_BASE}/api/email/attachments/${id}`, { headers });
+  }
+
+  deleteEmailAttachment(id: string) {
+    return this.emailRequest(`/api/email/attachments/${id}`, { method: 'DELETE' });
+  }
+
+  // === EMAIL TEMPLATES ===
+
+  getEmailTemplates() {
+    return this.emailRequest('/api/email/templates');
+  }
+
+  createEmailTemplate(template: { name: string; subject: string; body: string; html?: string }) {
+    return this.emailRequest('/api/email/templates', {
+      method: 'POST',
+      body: JSON.stringify(template),
+    });
+  }
+
+  updateEmailTemplate(id: string, data: Record<string, any>) {
+    return this.emailRequest(`/api/email/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  deleteEmailTemplate(id: string) {
+    return this.emailRequest(`/api/email/templates/${id}`, { method: 'DELETE' });
+  }
+
+  sendEmailWithTemplate(to: string, templateId: string, variables?: Record<string, string>) {
+    return this.emailRequest('/api/email/send/template', {
+      method: 'POST',
+      body: JSON.stringify({ to, templateId, variables }),
+    });
   }
 
   // === GITHUB DEPLOY ===
