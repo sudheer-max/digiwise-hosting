@@ -1,16 +1,6 @@
-const CACHE_NAME = 'digiwise-v5';
-const STATIC_ASSETS = [
-  '/favicon.png',
-  '/DIGIWISE-SOFTECH-LOGO.png',
-  '/manifest.json',
-];
+const CACHE_NAME = 'digiwise-v7';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -35,8 +25,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.endsWith('.html') || url.pathname === '/' || url.pathname.includes('/console') || url.pathname.includes('/dashboard') || url.pathname.includes('/auth')) {
-    event.respondWith(fetch(event.request));
+  if (event.request.headers.get('accept')?.includes('text/html') || url.pathname === '/') {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
