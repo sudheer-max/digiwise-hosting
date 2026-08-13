@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Rocket, Box, Database, Loader2, ArrowLeft, ArrowRight,
-  Check, Plus, Search, Github, Upload
+  Check, Plus, Search, Github, Upload, Code, List
 } from 'lucide-react';
 import api from '../../lib/api';
 import { PrimaryButton, GhostButton, Modal } from './ui';
@@ -50,6 +50,8 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
   const [port, setPort] = useState(3000);
   const [replicas, setReplicas] = useState(1);
   const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>([]);
+  const [envRawMode, setEnvRawMode] = useState(false);
+  const [envRawText, setEnvRawText] = useState('');
 
   // Step 3: config — github
   const [repoURL, setRepoURL] = useState('');
@@ -91,6 +93,36 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
     setEnvVars((prev) => prev.map((e, j) => (j === i ? { ...e, [field]: val } : e)));
   const removeEnvVar = (i: number) => setEnvVars((prev) => prev.filter((_, j) => j !== i));
 
+  const parseRawEnvVars = () => {
+    const lines = envRawText.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+    const parsed: { key: string; value: string }[] = [];
+    for (const line of lines) {
+      const eqIdx = line.indexOf('=');
+      if (eqIdx > 0) {
+        const key = line.slice(0, eqIdx).trim();
+        const value = line.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+        parsed.push({ key, value });
+      }
+    }
+    setEnvVars(parsed);
+    setEnvRawText('');
+    setEnvRawMode(false);
+  };
+
+  const syncEnvVarsToRaw = () => {
+    const lines = envVars.map(e => `${e.key}=${e.value}`);
+    setEnvRawText(lines.join('\n'));
+  };
+
+  const toggleEnvRawMode = () => {
+    if (envRawMode) {
+      parseRawEnvVars();
+    } else {
+      syncEnvVarsToRaw();
+      setEnvRawMode(true);
+    }
+  };
+
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
   const canNext = useMemo(() => {
@@ -115,6 +147,22 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
     setError('');
     setBusy(true);
     try {
+      // Parse raw env vars if in raw mode
+      let finalEnvVars = envVars;
+      if (envRawMode && envRawText.trim()) {
+        const lines = envRawText.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+        const parsed: { key: string; value: string }[] = [];
+        for (const line of lines) {
+          const eqIdx = line.indexOf('=');
+          if (eqIdx > 0) {
+            const key = line.slice(0, eqIdx).trim();
+            const value = line.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+            parsed.push({ key, value });
+          }
+        }
+        finalEnvVars = parsed;
+      }
+
       let projectId = selectedProjectId;
 
       if (createNewProject) {
@@ -129,7 +177,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
 
       if (appType === 'web') {
         const env: Record<string, string> = {};
-        for (const e of envVars) {
+        for (const e of finalEnvVars) {
           if (e.key.trim()) env[e.key.trim()] = e.value;
         }
         const res: any = await api.createApp(projectId, {
@@ -144,7 +192,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
         if (onCreated) onCreated(app?.name || app?.id || appName);
       } else if (appType === 'github') {
         const env: Record<string, string> = {};
-        for (const e of envVars) {
+        for (const e of finalEnvVars) {
           if (e.key.trim()) env[e.key.trim()] = e.value;
         }
         const res: any = await api.deployFromGitHub(projectId, {
@@ -372,7 +420,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                   className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Port *</label>
                   <input
@@ -399,32 +447,58 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Environment Variables</label>
-                  <GhostButton onClick={addEnvVar} className="!px-2 !py-1 text-[10px]"><Plus className="w-3 h-3" /> Add</GhostButton>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={toggleEnvRawMode}
+                      className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold border transition-colors cursor-pointer ${envRawMode ? 'border-[#00459c] bg-[#00459c]/5 text-[#00459c]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                    >
+                      {envRawMode ? <List className="w-3 h-3" /> : <Code className="w-3 h-3" />}
+                      {envRawMode ? 'Form' : 'Raw'}
+                    </button>
+                    {!envRawMode && (
+                      <GhostButton onClick={addEnvVar} className="!px-2 !py-1 text-[10px]"><Plus className="w-3 h-3" /> Add</GhostButton>
+                    )}
+                  </div>
                 </div>
-                {envVars.length === 0 && (
-                  <div className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2">No env vars configured.</div>
-                )}
-                <div className="space-y-2">
-                  {envVars.map((e, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                      <input
-                        type="text"
-                        value={e.key}
-                        onChange={(ev) => updateEnvVar(i, 'key', ev.target.value)}
-                        placeholder="KEY"
-                        className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={e.value}
-                        onChange={(ev) => updateEnvVar(i, 'value', ev.target.value)}
-                        placeholder="value"
-                        className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
-                      />
-                      <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">x</button>
+                {envRawMode ? (
+                  <div>
+                    <p className="text-[10px] text-slate-400 mb-1">Paste KEY=VALUE pairs, one per line. Lines starting with # are ignored.</p>
+                    <textarea
+                      value={envRawText}
+                      onChange={(e) => setEnvRawText(e.target.value)}
+                      placeholder={`DATABASE_URL=postgresql://user:pass@host:5432/db\nAPI_KEY=sk-xxxxx\nSECRET_TOKEN=xxx`}
+                      className="w-full h-32 border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono outline-none focus:border-[#00459c] resize-none"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {envVars.length === 0 && (
+                      <div className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2">No env vars configured.</div>
+                    )}
+                    <div className="space-y-2">
+                      {envVars.map((e, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                          <input
+                            type="text"
+                            value={e.key}
+                            onChange={(ev) => updateEnvVar(i, 'key', ev.target.value)}
+                            placeholder="KEY"
+                            className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={e.value}
+                            onChange={(ev) => updateEnvVar(i, 'value', ev.target.value)}
+                            placeholder="value"
+                            className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
+                          />
+                          <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">x</button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -500,32 +574,58 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Environment Variables</label>
-                  <GhostButton onClick={addEnvVar} className="!px-2 !py-1 text-[10px]"><Plus className="w-3 h-3" /> Add</GhostButton>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={toggleEnvRawMode}
+                      className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold border transition-colors cursor-pointer ${envRawMode ? 'border-[#00459c] bg-[#00459c]/5 text-[#00459c]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                    >
+                      {envRawMode ? <List className="w-3 h-3" /> : <Code className="w-3 h-3" />}
+                      {envRawMode ? 'Form' : 'Raw'}
+                    </button>
+                    {!envRawMode && (
+                      <GhostButton onClick={addEnvVar} className="!px-2 !py-1 text-[10px]"><Plus className="w-3 h-3" /> Add</GhostButton>
+                    )}
+                  </div>
                 </div>
-                {envVars.length === 0 && (
-                  <div className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2">No env vars configured.</div>
-                )}
-                <div className="space-y-2">
-                  {envVars.map((e, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                      <input
-                        type="text"
-                        value={e.key}
-                        onChange={(ev) => updateEnvVar(i, 'key', ev.target.value)}
-                        placeholder="KEY"
-                        className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
-                      />
-                      <input
-                        type="text"
-                        value={e.value}
-                        onChange={(ev) => updateEnvVar(i, 'value', ev.target.value)}
-                        placeholder="value"
-                        className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
-                      />
-                      <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">x</button>
+                {envRawMode ? (
+                  <div>
+                    <p className="text-[10px] text-slate-400 mb-1">Paste KEY=VALUE pairs, one per line. Lines starting with # are ignored.</p>
+                    <textarea
+                      value={envRawText}
+                      onChange={(e) => setEnvRawText(e.target.value)}
+                      placeholder={`DATABASE_URL=postgresql://user:pass@host:5432/db\nAPI_KEY=sk-xxxxx\nSECRET_TOKEN=xxx`}
+                      className="w-full h-32 border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono outline-none focus:border-[#00459c] resize-none"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {envVars.length === 0 && (
+                      <div className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2">No env vars configured.</div>
+                    )}
+                    <div className="space-y-2">
+                      {envVars.map((e, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                          <input
+                            type="text"
+                            value={e.key}
+                            onChange={(ev) => updateEnvVar(i, 'key', ev.target.value)}
+                            placeholder="KEY"
+                            className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={e.value}
+                            onChange={(ev) => updateEnvVar(i, 'value', ev.target.value)}
+                            placeholder="value"
+                            className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-mono outline-none"
+                          />
+                          <button onClick={() => removeEnvVar(i)} className="text-slate-400 hover:text-rose-600 px-2 py-2 text-xs cursor-pointer">x</button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -660,6 +760,16 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                   <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Port</span>
                   <span className="font-mono text-slate-700">{port}</span>
                 </div>
+                {envVars.length > 0 && (
+                  <div className="px-4 py-2.5">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Env Vars</span>
+                    <div className="mt-1 space-y-0.5">
+                      {envVars.filter(e => e.key.trim()).map((e, i) => (
+                        <div key={i} className="font-mono text-slate-700 text-[11px]">{e.key}=***</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {appType === 'github' && (
@@ -680,6 +790,16 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                   <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Port</span>
                   <span className="font-mono text-slate-700">{port}</span>
                 </div>
+                {envVars.length > 0 && (
+                  <div className="px-4 py-2.5">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Env Vars</span>
+                    <div className="mt-1 space-y-0.5">
+                      {envVars.filter(e => e.key.trim()).map((e, i) => (
+                        <div key={i} className="font-mono text-slate-700 text-[11px]">{e.key}=***</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {appType === 'database' && (
