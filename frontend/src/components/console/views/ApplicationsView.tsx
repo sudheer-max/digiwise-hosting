@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Rocket, GitBranch, Box, Copy, Check, ChevronRight, Plus, Globe, ExternalLink, Github, ShoppingCart } from 'lucide-react';
 import { useConsole } from '../ConsoleShell';
 import { SectionHeader, Loader, EmptyState, ErrorBanner, StatusPill, CopyField, PrimaryButton, GhostButton } from '../ui';
-import CreateApplicationWizard from '../CreateApplicationWizard';
 
 export default function ApplicationsView() {
   const { data, navigate } = useConsole();
   const { projects, loading, error, refresh, hasPaidPlan } = data;
-  const [showCreate, setShowCreate] = useState(false);
 
   const apps = (projects || []).flatMap((p) =>
     (p.apps || []).map((a: any) => ({
@@ -24,7 +22,7 @@ export default function ApplicationsView() {
         subtitle={`${apps.length} application(s) across all your projects.`}
         action={
           hasPaidPlan ? (
-            <PrimaryButton onClick={() => setShowCreate(true)}><Plus className="w-4 h-4" /> New Application</PrimaryButton>
+            <PrimaryButton onClick={() => navigate({ name: 'createApp' })}><Plus className="w-4 h-4" /> New Application</PrimaryButton>
           ) : (
             <a href="/checkout" className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider px-3.5 py-2 transition-colors">
               <ShoppingCart className="w-4 h-4" /> Purchase Plan to Deploy
@@ -32,8 +30,6 @@ export default function ApplicationsView() {
           )
         }
       />
-
-      {showCreate && hasPaidPlan && <CreateApplicationWizard onClose={() => setShowCreate(false)} onCreated={() => refresh()} />}
 
       {error && <ErrorBanner message={error} onRetry={refresh} />}
 
@@ -48,7 +44,7 @@ export default function ApplicationsView() {
           </p>
           <div className="flex items-center justify-center gap-3">
             {hasPaidPlan ? (
-              <PrimaryButton onClick={() => setShowCreate(true)}>
+              <PrimaryButton onClick={() => navigate({ name: 'createApp' })}>
                 <Plus className="w-4 h-4" /> Deploy Application
               </PrimaryButton>
             ) : (

@@ -4,7 +4,7 @@ import {
   Check, Plus, Search, Github, Upload, Code, List
 } from 'lucide-react';
 import api from '../../lib/api';
-import { PrimaryButton, GhostButton, Modal } from './ui';
+import { PrimaryButton, GhostButton } from './ui';
 import { useConsole } from './ConsoleShell';
 
 type Step = 1 | 2 | 3 | 4;
@@ -272,27 +272,38 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
   ];
 
   return (
-    <Modal
-      title={<span className="flex items-center gap-2"><Rocket className="w-4 h-4 text-[#00459c]" /> Create Application</span>}
-      onClose={onClose}
-      wide
-    >
-      {/* Stepper */}
-      <div className="flex items-center gap-1 mb-5">
-        {steps.map((s, i) => (
-          <div key={s.id} className={`flex-1 flex items-center gap-2 ${i > 0 ? 'ml-1' : ''}`}>
-            <div className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold shrink-0 ${step === s.id ? 'bg-[#00459c] text-white' : step > s.id ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-              {step > s.id ? <Check className="w-3 h-3" /> : s.id}
-            </div>
-            <div className="hidden sm:block">
-              <div className={`text-[10px] font-bold uppercase tracking-wider ${step >= s.id ? 'text-slate-800' : 'text-slate-400'}`}>{s.label}</div>
-            </div>
-            {i < steps.length - 1 && <div className={`flex-1 h-px ${step > s.id ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
-          </div>
-        ))}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onClose}
+          className="text-slate-400 hover:text-slate-700 cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <h1 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Rocket className="w-4 h-4 text-[#00459c]" />
+          Create Application
+        </h1>
       </div>
 
-      {error && <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3">{error}</div>}
+      <div className="bg-white border border-slate-200 shadow-sm p-6">
+        {/* Stepper */}
+        <div className="flex items-center gap-1 mb-5">
+          {steps.map((s, i) => (
+            <div key={s.id} className={`flex-1 flex items-center gap-2 ${i > 0 ? 'ml-1' : ''}`}>
+              <div className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold shrink-0 ${step === s.id ? 'bg-[#00459c] text-white' : step > s.id ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                {step > s.id ? <Check className="w-3 h-3" /> : s.id}
+              </div>
+              <div className="hidden sm:block">
+                <div className={`text-[10px] font-bold uppercase tracking-wider ${step >= s.id ? 'text-slate-800' : 'text-slate-400'}`}>{s.label}</div>
+              </div>
+              {i < steps.length - 1 && <div className={`flex-1 h-px ${step > s.id ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+            </div>
+          ))}
+        </div>
+
+        {error && <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold px-4 py-3">{error}</div>}
 
       {/* Step 1: Project */}
       {step === 1 && (
@@ -891,6 +902,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
           </PrimaryButton>
         )}
       </div>
-    </Modal>
+      </div>
+    </div>
   );
 }

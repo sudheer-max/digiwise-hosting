@@ -106,6 +106,7 @@ export type Route =  | { name: 'overview' }
   | { name: 'centralStation' }
   | { name: 'supportThreads' }
   | { name: 'infrastructure' }
+  | { name: 'createApp' }
   | { name: 'deployProgress'; projectId: string; appName: string; repoURL: string; branch: string; port: number; env?: Record<string, string>; buildCommand?: string; startCommand?: string };
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -155,6 +156,7 @@ const ROUTE_TITLES: Record<string, string> = {
   centralStation: 'Central Station',
   supportThreads: 'Support Threads',
   infrastructure: 'Infrastructure',
+  createApp: 'Create Application',
   deployProgress: 'Deploy Progress',
 };
 
@@ -235,7 +237,7 @@ export default function ConsoleShell() {
   const initialRoute = (() => {
     if (typeof window !== 'undefined') {
       const view = new URLSearchParams(window.location.search).get('view');
-      const valid = ['projects', 'templates', 'usage', 'plans', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview'];
+      const valid = ['projects', 'templates', 'usage', 'plans', 'people', 'auditLogs', 'sshKeys', 'earnings', 'referrals', 'docs', 'centralStation', 'supportThreads', 'infrastructure', 'applications', 'databases', 'compose', 'deployments', 'monitoring', 'schedules', 'traefik', 'docker', 'swarm', 'requests', 'servers', 'settings', 'profile', 'users', 'explorer', 'git', 'registries', 'destinations', 'certificates', 'cluster', 'notifications', 'license', 'sso', 'whitelabel', 'ai', 'tags', 'overview', 'createApp'];
       if (view && valid.includes(view)) return { name: view } as Route;
     }
     return { name: 'overview' } as Route;
@@ -407,6 +409,7 @@ export default function ConsoleShell() {
       case 'centralStation': return <CentralStationView />;
       case 'supportThreads': return <SupportThreadsView />;
       case 'infrastructure': return <InfrastructureView />;
+      case 'createApp': return <CreateApplicationWizard onClose={() => navigate({ name: 'applications' })} onCreated={() => { navigate({ name: 'applications' }); refresh(); }} />;
       case 'deployProgress': return <DeployProgressView projectId={route.projectId} appName={route.appName} repoURL={route.repoURL} branch={route.branch} port={route.port} env={route.env} buildCommand={route.buildCommand} startCommand={route.startCommand} />;
       default: return <OverviewView />;
     }
