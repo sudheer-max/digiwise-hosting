@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stalwart
+  namespace: stalwart
+  labels:
+    app: stalwart
+spec:
+  serviceName: stalwart
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stalwart
+  template:
+    metadata:
+      labels:
+        app: stalwart
+    spec:
+      containers:
+        - name: stalwart
+          image: stalwartlabs/stalwart:v0.11
+          args:
+            - "--config"
+            - "/etc/stalwart/config.json"
+          envFrom:
+            - secretRef:
+                name: stalwart-admin
+          ports:
+            - name: smtp
+              containerPort: 25
+            - name: submission
+              containerPort: 587
+            - name: smtps
+              containerPort: 465
+            - name: imap
+              containerPort: 143
+            - name: imaps
+              containerPort: 993
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /etc/stalwart/config.json
+              subPath: config.json
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/stalwart
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: config
+          configMap:
+            name: stalwart-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

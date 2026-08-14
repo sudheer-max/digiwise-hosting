@@ -475,80 +475,7 @@ export async function appRoutes(app: FastifyInstance) {
         env,
       });
 
-      // Poll for build completion (max 10 minutes)
-      const buildTimeout = 600000;
-      const pollInterval = 5000;
-      const startTime = Date.now();
-      let finalStatus = build;
-
-      while (Date.now() - startTime < buildTimeout) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
-        finalStatus = await getBuildStatus(project.k8sNamespace, build.name);
-
-        if (finalStatus.status === 'succeeded' || finalStatus.status === 'failed') {
-          break;
-        }
-      }
-
-      if (finalStatus.status === 'failed') {
-        return reply.status(500).send({
-          error: `Build failed: ${finalStatus.message}`,
-          buildName: build.name,
-        });
-      }
-
-      if (finalStatus.status !== 'succeeded') {
-        return reply.status(504).send({
-          error: 'Build timed out after 10 minutes',
-          buildName: build.name,
-        });
-      }
-
-      // Use the image tag from the Kaniko build (pushed to Harbor)
-      const imageTag = build.imageTag!;
-
-      // Create K8s deployment
-      await k8s.createDeployment(
-        project.k8sNamespace,
-        name,
-        imageTag,
-        port,
-        env,
-        1
-      );
-
-      // Create K8s service
-      await k8s.createService(
-        project.k8sNamespace,
-        name,
-        port,
-        port
-      );
-
-      // Create IngressRoute for external access
-      const ingressHost = `${name}.${project.k8sNamespace}.digiwisesoftech.com`;
-      try {
-        await k8s.createIngressRoute(
-          project.k8sNamespace,
-          name,
-          ingressHost,
-          port
-        );
-      } catch { /* ingress creation is optional */ }
-
-      // Audit log
-      await logAudit({
-        userId: user.id,
-        action: 'app.deploy-github',
-        resource: 'app',
-        resourceId: name,
-        details: { projectId, name, repoURL, branch, port, buildName: build.name },
-        ipAddress: request.ip,
-        userAgent: request.headers['user-agent'],
-      });
-
-      // Save/update deployment config for webhook auto-deploy
-      const webhookUrl = `${config.frontendUrl}/webhooks/github`;
+      // Save deployment config for webhook auto-deploy immediately
       const crypto = await import('crypto');
       const webhookSecret = crypto.randomBytes(20).toString('hex');
 
@@ -577,20 +504,105 @@ export async function appRoutes(app: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send({
+      // Return immediately with build info — frontend will poll for completion
+      return reply.status(202).send({
         success: true,
         name,
         repoURL,
         branch,
         port,
-        imageTag,
-        externalUrl: `https://${ingressHost}`,
-        webhookUrl,
-        webhookSecret,
-        message: 'Application deployed from GitHub successfully. Use the webhook URL to enable auto-deploy.',
+        buildName: build.name,
+        namespace: project.k8sNamespace,
+        status: 'building',
+        message: 'Build started. Poll /builds/:buildId for status.',
       });
     } catch (err: any) {
       return reply.status(500).send({ error: err.message || 'Failed to deploy from GitHub' });
+    }
+  });
+
+  // Finalize deployment after build completes (called by frontend after polling build status)
+  app.post<{ Params: { projectId: string }; Body: { name: string; buildName: string } }>('/api/projects/:projectId/apps/deploy-finalize', {
+    schema: {
+      tags: ['Applications'],
+      description: 'Finalize deployment after async build completes',
+      params: { type: 'object', properties: { projectId: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['name', 'buildName'],
+        properties: {
+          name: { type: 'string' },
+          buildName: { type: 'string' },
+        },
+      },
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: app.authenticate,
+  }, async (request, reply) => {
+    const user = request.user as { id: string; role?: string };
+    const { projectId } = request.params;
+    const { name, buildName } = request.body;
+
+    const project = await prisma.project.findFirst({
+      where: user.role === 'admin'
+        ? { id: projectId }
+        : { id: projectId, userId: user.id },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    try {
+      const buildStatus = await getBuildStatus(project.k8sNamespace, buildName);
+
+      if (buildStatus.status === 'failed') {
+        return reply.status(500).send({ error: `Build failed: ${buildStatus.message}` });
+      }
+
+      if (buildStatus.status !== 'succeeded') {
+        return reply.status(400).send({ error: 'Build is not yet complete', status: buildStatus.status });
+      }
+
+      const imageTag = buildStatus.imageTag!;
+      const { config } = await import('../config.js');
+      const port = 3000;
+
+      // Create K8s deployment
+      await k8s.createDeployment(project.k8sNamespace, name, imageTag, port, {}, 1);
+
+      // Create K8s service
+      await k8s.createService(project.k8sNamespace, name, port, port);
+
+      // Create IngressRoute for external access
+      const ingressHost = `${name}.${project.k8sNamespace}.digiwisesoftech.com`;
+      try {
+        await k8s.createIngressRoute(project.k8sNamespace, name, ingressHost, port);
+      } catch { /* ingress creation is optional */ }
+
+      // Audit log
+      await logAudit({
+        userId: user.id,
+        action: 'app.deploy-github',
+        resource: 'app',
+        resourceId: name,
+        details: { projectId, name, buildName, imageTag },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      const webhookUrl = `${config.frontendUrl}/webhooks/github`;
+
+      return reply.status(201).send({
+        success: true,
+        name,
+        imageTag,
+        externalUrl: `https://${ingressHost}`,
+        webhookUrl,
+        message: 'Application deployed successfully.',
+      });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message || 'Failed to finalize deployment' });
     }
   });
 

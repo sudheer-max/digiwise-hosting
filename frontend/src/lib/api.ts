@@ -613,6 +613,13 @@ class ApiClient {
     }, 600000);
   }
 
+  finalizeDeploy(projectId: string, name: string, buildName: string) {
+    return this.request(`/projects/${projectId}/apps/deploy-finalize`, {
+      method: 'POST',
+      body: JSON.stringify({ name, buildName }),
+    }, 30000);
+  }
+
   // === WEBHOOK / AUTO-DEPLOY ===
 
   setupWebhook(projectId: string, appName: string, autoDeploy: boolean) {

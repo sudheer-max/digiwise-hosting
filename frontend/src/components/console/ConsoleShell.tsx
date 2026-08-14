@@ -58,6 +58,7 @@ import DocsView from './views/DocsView';
 import CentralStationView from './views/CentralStationView';
 import SupportThreadsView from './views/SupportThreadsView';
 import InfrastructureView from './views/InfrastructureView';
+import DeployProgressView from './views/DeployProgressView';
 
 export type Route =  | { name: 'overview' }
   | { name: 'projects' }
@@ -104,7 +105,8 @@ export type Route =  | { name: 'overview' }
   | { name: 'docs' }
   | { name: 'centralStation' }
   | { name: 'supportThreads' }
-  | { name: 'infrastructure' };
+  | { name: 'infrastructure' }
+  | { name: 'deployProgress'; projectId: string; appName: string; buildName: string; namespace: string; repoURL: string; branch: string; port: number };
 
 const ROUTE_TITLES: Record<string, string> = {
   overview: 'Home',
@@ -153,6 +155,7 @@ const ROUTE_TITLES: Record<string, string> = {
   centralStation: 'Central Station',
   supportThreads: 'Support Threads',
   infrastructure: 'Infrastructure',
+  deployProgress: 'Deploy Progress',
 };
 
 interface ConsoleData {
@@ -404,6 +407,7 @@ export default function ConsoleShell() {
       case 'centralStation': return <CentralStationView />;
       case 'supportThreads': return <SupportThreadsView />;
       case 'infrastructure': return <InfrastructureView />;
+      case 'deployProgress': return <DeployProgressView projectId={route.projectId} appName={route.appName} buildName={route.buildName} namespace={route.namespace} repoURL={route.repoURL} branch={route.branch} port={route.port} />;
       default: return <OverviewView />;
     }
   };

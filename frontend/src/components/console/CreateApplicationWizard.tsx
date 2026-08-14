@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import api from '../../lib/api';
 import { PrimaryButton, GhostButton, Modal } from './ui';
+import { useConsole } from './ConsoleShell';
 
 type Step = 1 | 2 | 3 | 4;
 type AppType = 'web' | 'database' | 'github' | 'upload';
@@ -31,6 +32,8 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
   onCreated?: (id: string) => void;
   projectId?: string;
 }) {
+  const ctx = useConsole();
+  const navigate = ctx?.navigate;
   const [step, setStep] = useState<Step>(initialProjectId ? 2 : 1);
 
   // Step 1: project
@@ -204,8 +207,22 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
           port,
           ...(Object.keys(env).length > 0 ? { env } : {}),
         });
-        setResult(res);
-        if (onCreated) onCreated(appName);
+        // Navigate to deploy progress page
+        if (navigate) {
+          navigate({
+            name: 'deployProgress',
+            projectId,
+            appName: appName.trim(),
+            buildName: res?.buildName || '',
+            namespace: res?.namespace || '',
+            repoURL: repoURL.trim(),
+            branch: branch.trim() || 'main',
+            port,
+          });
+        } else {
+          setResult(res);
+          if (onCreated) onCreated(appName);
+        }
       } else if (appType === 'upload') {
         const res: any = await api.uploadZip(projectId, {
           name: appName.trim(),
