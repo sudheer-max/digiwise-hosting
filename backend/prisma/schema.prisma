@@ -63,6 +63,7 @@ model Project {
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deploymentConfigs DeploymentConfig[]
 
   @@index([userId])
   @@map("projects")
@@ -185,4 +186,30 @@ model EmailTemplate {
 
   @@index([userId])
   @@map("email_templates")
+}
+
+model DeploymentConfig {
+  id              String   @id @default(cuid())
+  projectId       String
+  appName         String
+  repoURL         String
+  branch          String   @default("main")
+  webhookSecret   String?
+  webhookId       Int?     // GitHub webhook ID for management
+  autoDeploy      Boolean  @default(false)
+  buildCommand    String?
+  startCommand    String?
+  port            Int      @default(3000)
+  lastDeployedAt  DateTime?
+  lastCommitSha   String?
+  lastCommitMsg   String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, appName])
+  @@index([projectId])
+  @@index([repoURL])
+  @@map("deployment_configs")
 }

@@ -31,6 +31,7 @@ import { auditRoutes } from './routes/audit.js';
 import { buildRoutes } from './routes/builds.js';
 import { uploadRoutes } from './routes/upload.js';
 import { emailRoutes } from './routes/email.js';
+import { webhookRoutes } from './routes/webhooks.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -136,6 +137,7 @@ export async function buildApp() {
   await app.register(geoRoutes);
   await app.register(uploadRoutes);
   await app.register(emailRoutes);
+  await app.register(webhookRoutes);
 
   // Scalar API docs
   await app.register(scalar, {

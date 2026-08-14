@@ -19,6 +19,8 @@ export const config = {
   github: {
     clientId: process.env.GITHUB_CLIENT_ID || '',
     clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+    webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
+    token: process.env.GITHUB_TOKEN || '',
   },
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@example.com',

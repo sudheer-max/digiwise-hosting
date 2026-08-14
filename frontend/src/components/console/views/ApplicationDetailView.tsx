@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Rocket, GitBranch, Box, Play, Power, RotateCw, Terminal, Trash2, Globe, Save,
   ListTree, KeyRound, HardDrive, Cpu, MemoryStick, ArrowUpRight, Layers, Loader2, RefreshCw, ExternalLink, Check,
-  Hammer, Shield
+  Hammer, Shield, Webhook
 } from 'lucide-react';
 import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
@@ -14,8 +14,9 @@ import EnvironmentVariablesPanel from './EnvironmentVariablesPanel';
 import BuildPipelinePanel from './BuildPipelinePanel';
 import CustomDomainsPanel from './CustomDomainsPanel';
 import LogsViewerPanel from './LogsViewerPanel';
+import WebhookSettingsPanel from './WebhookSettingsPanel';
 
-type Tab = 'overview' | 'env' | 'builds' | 'domains' | 'logs' | 'deployments' | 'advanced';
+type Tab = 'overview' | 'env' | 'builds' | 'domains' | 'logs' | 'deployments' | 'webhooks' | 'advanced';
 
 export default function ApplicationDetailView({ projectId, name }: { projectId: string; name: string }) {
   const { data, navigate } = useConsole();
@@ -111,6 +112,7 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
     { id: 'overview', label: 'Overview', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'env', label: 'Variables', icon: <KeyRound className="w-3.5 h-3.5" /> },
     { id: 'builds', label: 'Builds', icon: <Hammer className="w-3.5 h-3.5" /> },
+    { id: 'webhooks', label: 'Webhooks', icon: <Webhook className="w-3.5 h-3.5" /> },
     { id: 'domains', label: 'Domains', icon: <Globe className="w-3.5 h-3.5" /> },
     { id: 'logs', label: 'Logs', icon: <Terminal className="w-3.5 h-3.5" /> },
     { id: 'deployments', label: 'Deployments', icon: <ListTree className="w-3.5 h-3.5" /> },
@@ -219,6 +221,10 @@ export default function ApplicationDetailView({ projectId, name }: { projectId: 
 
         {tab === 'builds' && (
           <BuildPipelinePanel projectId={projectId} appName={name} />
+        )}
+
+        {tab === 'webhooks' && (
+          <WebhookSettingsPanel projectId={projectId} appName={name} />
         )}
 
         {tab === 'domains' && (

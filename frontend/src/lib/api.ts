@@ -158,7 +158,7 @@ class ApiClient {
     formData.append('name', opts.name);
     formData.append('port', String(opts.port));
 
-    return fetch(`${API_BASE}/api/projects/${projectId}/apps/upload`, {
+    return fetch(`${API_BASE}/projects/${projectId}/apps/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getToken()}`,
@@ -366,7 +366,7 @@ class ApiClient {
   // === DATABASE BACKUP/IMPORT ===
 
   backupDatabase(namespace: string, type: string, name: string) {
-    return fetch(`${API_BASE}/api/databases/${namespace}/${type}/${name}/backup`, {
+    return fetch(`${API_BASE}/databases/${namespace}/${type}/${name}/backup`, {
       headers: { 'Authorization': `Bearer ${this.getToken()}` },
     }).then(async (r) => {
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Backup failed'); }
@@ -377,7 +377,7 @@ class ApiClient {
   importDatabase(namespace: string, type: string, name: string, file: File) {
     const formData = new FormData();
     formData.append('file', file);
-    return fetch(`${API_BASE}/api/databases/${namespace}/${type}/${name}/import`, {
+    return fetch(`${API_BASE}/databases/${namespace}/${type}/${name}/import`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${this.getToken()}` },
       body: formData,
@@ -423,7 +423,7 @@ class ApiClient {
   }
 
   createEmailSession(config: { email: string; password: string; host?: string; port?: number; secure?: boolean; fromName?: string }) {
-    return fetch(`${API_BASE}/api/email/session`, {
+    return fetch(`${API_BASE}/email/session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
@@ -505,7 +505,7 @@ class ApiClient {
     const token = this.getEmailToken();
     const headers: Record<string, string> = {};
     if (token) headers['X-Email-Token'] = token;
-    const r = await fetch(`${API_BASE}/api/email/attachments`, {
+    const r = await fetch(`${API_BASE}/email/attachments`, {
       method: 'POST',
       headers,
       body: formData,
@@ -518,7 +518,7 @@ class ApiClient {
     const token = this.getEmailToken();
     const headers: Record<string, string> = {};
     if (token) headers['X-Email-Token'] = token;
-    return fetch(`${API_BASE}/api/email/attachments/${id}`, { headers });
+    return fetch(`${API_BASE}/email/attachments/${id}`, { headers });
   }
 
   deleteEmailAttachment(id: string) {
@@ -607,6 +607,19 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  }
+
+  // === WEBHOOK / AUTO-DEPLOY ===
+
+  setupWebhook(projectId: string, appName: string, autoDeploy: boolean) {
+    return this.request(`/projects/${projectId}/apps/${appName}/webhook`, {
+      method: 'POST',
+      body: JSON.stringify({ autoDeploy }),
+    });
+  }
+
+  getWebhookStatus(projectId: string, appName: string) {
+    return this.request(`/projects/${projectId}/apps/${appName}/webhook`);
   }
 
   getAppVariables(projectId: string, name: string) {

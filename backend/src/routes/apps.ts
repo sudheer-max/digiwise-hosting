@@ -1,11 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../db/client.js';
+import { config } from '../config.js';
 import * as k8s from '../services/kubernetes.js';
 import { assertProjectOwned, OwnershipError } from '../services/ownership.js';
-import { execSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 import { logAudit } from '../services/audit.js';
+import { createBuildJob, getBuildStatus } from '../services/build.js';
 
 export async function appRoutes(app: FastifyInstance) {
   // Create a new application (deployment + service)
@@ -464,25 +463,49 @@ export async function appRoutes(app: FastifyInstance) {
     }
 
     try {
-      // Clone the repo to a temp directory
-      const tmpDir = `/tmp/build-${Date.now()}`;
-      execSync(`git clone --depth 1 -b ${branch} ${repoURL} ${tmpDir}`, { timeout: 60000 });
+      // Create Kaniko build job (clones repo via alpine/git, builds via kaniko)
+      const build = await createBuildJob({
+        name,
+        namespace: project.k8sNamespace,
+        repoURL,
+        branch,
+        buildCommand,
+        startCommand,
+        port,
+        env,
+      });
 
-      // Build Docker image
-      const dockerfile = generateDockerfile(tmpDir, buildCommand, startCommand);
-      fs.writeFileSync(path.join(tmpDir, 'Dockerfile'), dockerfile);
+      // Poll for build completion (max 10 minutes)
+      const buildTimeout = 600000;
+      const pollInterval = 5000;
+      const startTime = Date.now();
+      let finalStatus = build;
 
-      const imageTag = `digiwise/${name}:latest`;
-      execSync(`docker build -t ${imageTag} ${tmpDir}`, { timeout: 300000, cwd: tmpDir });
+      while (Date.now() - startTime < buildTimeout) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        finalStatus = await getBuildStatus(project.k8sNamespace, build.name);
 
-      // Import into K3s containerd
-      const tarPath = `/tmp/${name}.tar`;
-      execSync(`docker save ${imageTag} -o ${tarPath}`, { timeout: 120000 });
-      execSync(`k3s ctr images import ${tarPath}`, { timeout: 120000 });
-      execSync(`rm -f ${tarPath}`);
+        if (finalStatus.status === 'succeeded' || finalStatus.status === 'failed') {
+          break;
+        }
+      }
 
-      // Cleanup temp dir
-      execSync(`rm -rf ${tmpDir}`);
+      if (finalStatus.status === 'failed') {
+        return reply.status(500).send({
+          error: `Build failed: ${finalStatus.message}`,
+          buildName: build.name,
+        });
+      }
+
+      if (finalStatus.status !== 'succeeded') {
+        return reply.status(504).send({
+          error: 'Build timed out after 10 minutes',
+          buildName: build.name,
+        });
+      }
+
+      // Use the image tag from the Kaniko build (pushed to Harbor)
+      const imageTag = build.imageTag!;
 
       // Create K8s deployment
       await k8s.createDeployment(
@@ -519,9 +542,39 @@ export async function appRoutes(app: FastifyInstance) {
         action: 'app.deploy-github',
         resource: 'app',
         resourceId: name,
-        details: { projectId, name, repoURL, branch, port },
+        details: { projectId, name, repoURL, branch, port, buildName: build.name },
         ipAddress: request.ip,
         userAgent: request.headers['user-agent'],
+      });
+
+      // Save/update deployment config for webhook auto-deploy
+      const webhookUrl = `${config.frontendUrl}/webhooks/github`;
+      const crypto = await import('crypto');
+      const webhookSecret = crypto.randomBytes(20).toString('hex');
+
+      await prisma.deploymentConfig.upsert({
+        where: { projectId_appName: { projectId, appName: name } },
+        create: {
+          projectId,
+          appName: name,
+          repoURL,
+          branch,
+          buildCommand: buildCommand || null,
+          startCommand: startCommand || null,
+          port,
+          webhookSecret,
+          webhookId: null,
+          autoDeploy: false,
+          lastDeployedAt: new Date(),
+        },
+        update: {
+          repoURL,
+          branch,
+          buildCommand: buildCommand || null,
+          startCommand: startCommand || null,
+          port,
+          lastDeployedAt: new Date(),
+        },
       });
 
       return reply.status(201).send({
@@ -530,8 +583,11 @@ export async function appRoutes(app: FastifyInstance) {
         repoURL,
         branch,
         port,
+        imageTag,
         externalUrl: `https://${ingressHost}`,
-        message: 'Application deployed from GitHub successfully',
+        webhookUrl,
+        webhookSecret,
+        message: 'Application deployed from GitHub successfully. Use the webhook URL to enable auto-deploy.',
       });
     } catch (err: any) {
       return reply.status(500).send({ error: err.message || 'Failed to deploy from GitHub' });
@@ -811,101 +867,4 @@ export async function appRoutes(app: FastifyInstance) {
       return reply.status(500).send({ error: err.message });
     }
   });
-}
-
-// Generate a basic Dockerfile for common Node.js/Python apps
-function generateDockerfile(repoDir: string, buildCommand?: string, startCommand?: string): string {
-  // Check if package.json exists (Node.js)
-  if (fs.existsSync(path.join(repoDir, 'package.json'))) {
-    const pkg = JSON.parse(fs.readFileSync(path.join(repoDir, 'package.json'), 'utf-8'));
-    const isNext = !!pkg.dependencies?.next;
-    const isVite = !!pkg.dependencies?.vite;
-
-    if (isNext) {
-      return `FROM node:22-slim AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-FROM node:22-slim
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm install --omit=dev
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-EXPOSE 3000
-CMD ["npx", "next", "start", "-p", "3000"]
-`;
-    }
-
-    if (isVite) {
-      return `FROM node:22-slim AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-FROM node:22-slim
-WORKDIR /app
-RUN npm install -g serve
-COPY --from=builder /app/dist ./dist
-EXPOSE 3000
-CMD ["serve", "-s", "dist", "-l", "3000"]
-`;
-    }
-
-    return `FROM node:22-slim
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-${buildCommand ? `RUN ${buildCommand}` : ''}
-EXPOSE 3000
-CMD ${startCommand ? `["sh", "-c", "${startCommand}"]` : '["node", "index.js"]'}
-`;
-  }
-
-  // Check if requirements.txt exists (Python)
-  if (fs.existsSync(path.join(repoDir, 'requirements.txt'))) {
-    return `FROM python:3.12-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-${buildCommand ? `RUN ${buildCommand}` : ''}
-EXPOSE 3000
-CMD ${startCommand ? `["sh", "-c", "${startCommand}"]` : '["python", "app.py"]'}
-`;
-  }
-
-  // Check if go.mod exists (Go)
-  if (fs.existsSync(path.join(repoDir, 'go.mod'))) {
-    return `FROM golang:1.22 AS builder
-WORKDIR /app
-COPY go.mod go.sum* ./
-RUN go mod download
-COPY . .
-${buildCommand ? `RUN ${buildCommand}` : 'RUN CGO_ENABLED=0 go build -o main .'}
-RUN go build -o main .
-
-FROM alpine:latest
-WORKDIR /app
-COPY --from=builder /app/main .
-EXPOSE 3000
-CMD ["./main"]
-`;
-  }
-
-  // Default: static file server
-  return `FROM node:22-slim
-WORKDIR /app
-COPY . .
-RUN npm install -g serve
-EXPOSE 3000
-CMD ["serve", "-s", ".", "-l", "3000"]
-`;
 }
