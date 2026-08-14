@@ -158,19 +158,23 @@ class ApiClient {
     formData.append('name', opts.name);
     formData.append('port', String(opts.port));
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 600000);
+
     return fetch(`${API_BASE}/projects/${projectId}/apps/upload`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getToken()}`,
       },
       body: formData,
+      signal: controller.signal,
     }).then(async (r) => {
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));
         throw new Error(body.error || body.message || `HTTP ${r.status}`);
       }
       return r.json();
-    });
+    }).finally(() => clearTimeout(timer));
   }
 
   // Admin
@@ -258,7 +262,7 @@ class ApiClient {
     return this.request(`/projects/${id}/deploy`, {
       method: 'POST',
       body: JSON.stringify(input),
-    });
+    }, 600000);
   }
 
   // === KUBERNETES-NATIVE APPLICATIONS ===
@@ -606,7 +610,7 @@ class ApiClient {
     return this.request(`/projects/${projectId}/apps/deploy-github`, {
       method: 'POST',
       body: JSON.stringify(input),
-    });
+    }, 600000);
   }
 
   // === WEBHOOK / AUTO-DEPLOY ===
@@ -657,7 +661,7 @@ class ApiClient {
     return this.request(`/projects/${projectId}/apps/${appName}/builds`, {
       method: 'POST',
       body: JSON.stringify(input),
-    });
+    }, 600000);
   }
 
   getBuildStatus(projectId: string, appName: string, buildId: string) {
