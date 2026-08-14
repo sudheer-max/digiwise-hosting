@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { api } from '../../../lib/api';
+import api from '../../../lib/api';
 import { useConsole } from '../ConsoleShell';
 import {
   Loader2, CheckCircle2, XCircle, Terminal, ArrowLeft,

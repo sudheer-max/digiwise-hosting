@@ -118,7 +118,7 @@ export async function buildRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found' });
     }
 
-    const build = await getBuildStatus(project.k8sNamespace, `${appName}-${buildId}`);
+    const build = await getBuildStatus(project.k8sNamespace, buildId);
     return build;
   });
 
@@ -161,7 +161,7 @@ export async function buildRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found' });
     }
 
-    const logs = await getBuildLogs(project.k8sNamespace, `${appName}-${buildId}`);
+    const logs = await getBuildLogs(project.k8sNamespace, buildId);
     return { logs };
   });
 
@@ -241,14 +241,14 @@ export async function buildRoutes(app: FastifyInstance) {
     }
 
     try {
-      await cancelBuild(project.k8sNamespace, `${appName}-${buildId}`);
+      await cancelBuild(project.k8sNamespace, buildId);
 
       // Audit log
       await logAudit({
         userId: user.id,
         action: 'build.cancel',
         resource: 'build',
-        resourceId: `${appName}-${buildId}`,
+        resourceId: buildId,
         details: { projectId, appName },
         ipAddress: request.ip,
         userAgent: request.headers['user-agent'],
@@ -293,7 +293,7 @@ export async function buildRoutes(app: FastifyInstance) {
     }
 
     try {
-      await deleteBuildJob(project.k8sNamespace, `${appName}-${buildId}`);
+      await deleteBuildJob(project.k8sNamespace, buildId);
       return { success: true };
     } catch (err: any) {
       return reply.status(500).send({ error: err.message });
