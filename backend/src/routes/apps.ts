@@ -426,7 +426,7 @@ export async function appRoutes(app: FastifyInstance) {
   });
 
   // Deploy from GitHub repository
-  app.post<{ Params: { projectId: string }; Body: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> } }>('/api/projects/:projectId/apps/deploy-github', {
+  app.post<{ Params: { projectId: string }; Body: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string>; githubToken?: string } }>('/api/projects/:projectId/apps/deploy-github', {
     schema: {
       tags: ['Applications'],
       description: 'Deploy an application from a GitHub repository',
@@ -442,6 +442,7 @@ export async function appRoutes(app: FastifyInstance) {
           startCommand: { type: 'string' },
           port: { type: 'number', minimum: 1, maximum: 65535 },
           env: { type: 'object', additionalProperties: { type: 'string' } },
+          githubToken: { type: 'string', description: 'GitHub Personal Access Token for private repos' },
         },
       },
       security: [{ bearerAuth: [] }],
@@ -450,7 +451,7 @@ export async function appRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const user = request.user as { id: string; role?: string };
     const { projectId } = request.params;
-    const { name, repoURL, branch = 'main', buildCommand, startCommand, port, env } = request.body;
+    const { name, repoURL, branch = 'main', buildCommand, startCommand, port, env, githubToken } = request.body;
 
     const project = await prisma.project.findFirst({
       where: user.role === 'admin'
@@ -473,6 +474,7 @@ export async function appRoutes(app: FastifyInstance) {
         startCommand,
         port,
         env,
+        githubToken: githubToken || undefined,
       });
 
       // Save deployment config for webhook auto-deploy immediately

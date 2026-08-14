@@ -24,6 +24,7 @@ export interface BuildConfig {
   port: number;
   env?: Record<string, string>;
   dockerfile?: string;
+  githubToken?: string;
 }
 
 export interface BuildStatus {
@@ -47,6 +48,18 @@ export async function createBuildJob(config: BuildConfig): Promise<BuildStatus> 
   const buildId = `build-${Date.now()}`;
   const jobName = `${config.name}-${buildId}`;
   const imageTag = `${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${config.name}:${buildId}`;
+
+  // Build the clone URL with token if provided
+  let cloneURL = config.repoURL;
+  if (config.githubToken) {
+    if (cloneURL.startsWith('https://')) {
+      cloneURL = cloneURL.replace('https://', `https://${config.githubToken}@`);
+    } else if (cloneURL.startsWith('http://')) {
+      cloneURL = cloneURL.replace('http://', `http://${config.githubToken}@`);
+    } else if (!cloneURL.includes('@')) {
+      cloneURL = `https://${config.githubToken}@${cloneURL}`;
+    }
+  }
 
   // Create a ConfigMap with the build script
   const buildScript = generateBuildScript(config);
@@ -128,7 +141,7 @@ export async function createBuildJob(config: BuildConfig): Promise<BuildStatus> 
               name: 'git-clone',
               image: GIT_IMAGE,
               command: ['/bin/sh', '-c'],
-              args: [`git clone --depth 1 -b ${config.branch} ${config.repoURL} /workspace/source`],
+              args: [`git clone --depth 1 -b ${config.branch} ${cloneURL} /workspace/source`],
               volumeMounts: [
                 {
                   name: 'workspace',

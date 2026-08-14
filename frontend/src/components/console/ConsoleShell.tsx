@@ -107,7 +107,7 @@ export type Route =  | { name: 'overview' }
   | { name: 'supportThreads' }
   | { name: 'infrastructure' }
   | { name: 'createApp' }
-  | { name: 'deployProgress'; projectId: string; appName: string; repoURL: string; branch: string; port: number; env?: Record<string, string>; buildCommand?: string; startCommand?: string };
+  | { name: 'deployProgress'; projectId: string; appName: string; repoURL: string; branch: string; port: number; env?: Record<string, string>; buildCommand?: string; startCommand?: string; githubToken?: string };
 
 const ROUTE_TITLES: Record<string, string> = {
   overview: 'Home',
@@ -410,7 +410,7 @@ export default function ConsoleShell() {
       case 'supportThreads': return <SupportThreadsView />;
       case 'infrastructure': return <InfrastructureView />;
       case 'createApp': return <CreateApplicationWizard onClose={() => navigate({ name: 'applications' })} onCreated={() => { navigate({ name: 'applications' }); refresh(); }} />;
-      case 'deployProgress': return <DeployProgressView projectId={route.projectId} appName={route.appName} repoURL={route.repoURL} branch={route.branch} port={route.port} env={route.env} buildCommand={route.buildCommand} startCommand={route.startCommand} />;
+      case 'deployProgress': return <DeployProgressView projectId={route.projectId} appName={route.appName} repoURL={route.repoURL} branch={route.branch} port={route.port} env={route.env} buildCommand={route.buildCommand} startCommand={route.startCommand} githubToken={route.githubToken} />;
       default: return <OverviewView />;
     }
   };

@@ -61,6 +61,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
   const [branch, setBranch] = useState('main');
   const [buildCommand, setBuildCommand] = useState('');
   const [startCommand, setStartCommand] = useState('');
+  const [githubToken, setGithubToken] = useState('');
 
   // Step 3: config — database
   const [dbType, setDbType] = useState<string>('postgresql');
@@ -220,6 +221,7 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               : {}),
             ...(buildCommand.trim() ? { buildCommand: buildCommand.trim() } : {}),
             ...(startCommand.trim() ? { startCommand: startCommand.trim() } : {}),
+            ...(githubToken.trim() ? { githubToken: githubToken.trim() } : {}),
           });
         } else {
           // Fallback: call API directly (shouldn't happen inside ConsoleShell)
@@ -610,10 +612,21 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                     type="text"
                     value={startCommand}
                     onChange={(e) => setStartCommand(e.target.value)}
-                    placeholder="npm start"
-                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
-                  />
+                  placeholder="npm start"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                />
                 </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">GitHub Token (for private repos)</label>
+                <input
+                  type="password"
+                  value={githubToken}
+                  onChange={(e) => setGithubToken(e.target.value)}
+                  placeholder="ghp_xxxxxxxxxxxx (leave empty for public repos)"
+                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Required for private repos. Create at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" className="underline">github.com/settings/tokens</a> with <strong>repo</strong> scope.</p>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">

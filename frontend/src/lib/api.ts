@@ -606,7 +606,7 @@ class ApiClient {
 
   // === GITHUB DEPLOY ===
 
-  deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string> }) {
+  deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string>; githubToken?: string }) {
     return this.request(`/projects/${projectId}/apps/deploy-github`, {
       method: 'POST',
       body: JSON.stringify(input),
