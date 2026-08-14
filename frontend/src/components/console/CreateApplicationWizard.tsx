@@ -194,32 +194,48 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
         setResult(app);
         if (onCreated) onCreated(app?.name || app?.id || appName);
       } else if (appType === 'github') {
-        const env: Record<string, string> = {};
-        for (const e of finalEnvVars) {
-          if (e.key.trim()) env[e.key.trim()] = e.value;
+        let projectId = selectedProjectId;
+
+        if (createNewProject) {
+          const res: any = await api.createProject({
+            name: newProjectName.trim(),
+            description: newProjectDesc.trim() || undefined,
+          });
+          const created = res?.project || res;
+          projectId = created?.id || created?.project?.id;
+          if (!projectId) throw new Error('Failed to create project — no ID returned');
         }
-        const res: any = await api.deployFromGitHub(projectId, {
-          name: appName.trim(),
-          repoURL: repoURL.trim(),
-          branch: branch.trim() || 'main',
-          buildCommand: buildCommand.trim() || undefined,
-          startCommand: startCommand.trim() || undefined,
-          port,
-          ...(Object.keys(env).length > 0 ? { env } : {}),
-        });
-        // Navigate to deploy progress page
+
+        // Navigate to deploy progress page — DeployProgressView handles the API call
         if (navigate) {
           navigate({
             name: 'deployProgress',
             projectId,
             appName: appName.trim(),
-            buildName: res?.buildName || '',
-            namespace: res?.namespace || '',
             repoURL: repoURL.trim(),
             branch: branch.trim() || 'main',
             port,
+            ...(Object.keys(finalEnvVars.reduce((acc, e) => { if (e.key.trim()) acc[e.key.trim()] = e.value; return acc; }, {} as Record<string, string>)).length > 0
+              ? { env: finalEnvVars.reduce((acc, e) => { if (e.key.trim()) acc[e.key.trim()] = e.value; return acc; }, {} as Record<string, string>) }
+              : {}),
+            ...(buildCommand.trim() ? { buildCommand: buildCommand.trim() } : {}),
+            ...(startCommand.trim() ? { startCommand: startCommand.trim() } : {}),
           });
         } else {
+          // Fallback: call API directly (shouldn't happen inside ConsoleShell)
+          const env: Record<string, string> = {};
+          for (const e of finalEnvVars) {
+            if (e.key.trim()) env[e.key.trim()] = e.value;
+          }
+          const res: any = await api.deployFromGitHub(projectId, {
+            name: appName.trim(),
+            repoURL: repoURL.trim(),
+            branch: branch.trim() || 'main',
+            buildCommand: buildCommand.trim() || undefined,
+            startCommand: startCommand.trim() || undefined,
+            port,
+            ...(Object.keys(env).length > 0 ? { env } : {}),
+          });
           setResult(res);
           if (onCreated) onCreated(appName);
         }

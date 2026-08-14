@@ -106,7 +106,7 @@ export type Route =  | { name: 'overview' }
   | { name: 'centralStation' }
   | { name: 'supportThreads' }
   | { name: 'infrastructure' }
-  | { name: 'deployProgress'; projectId: string; appName: string; buildName: string; namespace: string; repoURL: string; branch: string; port: number };
+  | { name: 'deployProgress'; projectId: string; appName: string; repoURL: string; branch: string; port: number; env?: Record<string, string>; buildCommand?: string; startCommand?: string };
 
 const ROUTE_TITLES: Record<string, string> = {
   overview: 'Home',
@@ -407,7 +407,7 @@ export default function ConsoleShell() {
       case 'centralStation': return <CentralStationView />;
       case 'supportThreads': return <SupportThreadsView />;
       case 'infrastructure': return <InfrastructureView />;
-      case 'deployProgress': return <DeployProgressView projectId={route.projectId} appName={route.appName} buildName={route.buildName} namespace={route.namespace} repoURL={route.repoURL} branch={route.branch} port={route.port} />;
+      case 'deployProgress': return <DeployProgressView projectId={route.projectId} appName={route.appName} repoURL={route.repoURL} branch={route.branch} port={route.port} env={route.env} buildCommand={route.buildCommand} startCommand={route.startCommand} />;
       default: return <OverviewView />;
     }
   };
