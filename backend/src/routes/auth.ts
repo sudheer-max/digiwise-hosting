@@ -281,7 +281,7 @@ export async function authRoutes(app: FastifyInstance) {
       if (existingByEmail) {
         user = await prisma.user.update({
           where: { id: existingByEmail.id },
-          data: { githubId, avatarUrl: ghUser.avatar_url, name: ghUser.name || ghUser.login },
+          data: { githubId, githubToken: accessToken, avatarUrl: ghUser.avatar_url, name: ghUser.name || ghUser.login },
         });
       } else {
         user = await prisma.user.create({
@@ -290,6 +290,7 @@ export async function authRoutes(app: FastifyInstance) {
             name: ghUser.name || ghUser.login,
             password: '',
             githubId,
+            githubToken: accessToken,
             avatarUrl: ghUser.avatar_url,
             role: 'user',
           },
@@ -298,11 +299,71 @@ export async function authRoutes(app: FastifyInstance) {
     } else {
       user = await prisma.user.update({
         where: { id: user.id },
-        data: { name: ghUser.name || ghUser.login, avatarUrl: ghUser.avatar_url, email: primaryEmail },
+        data: { name: ghUser.name || ghUser.login, avatarUrl: ghUser.avatar_url, email: primaryEmail, githubToken: accessToken },
       });
     }
 
     const token = app.jwt.sign({ id: user.id, email: user.email, role: user.role });
     return { token, user: { id: user.id, email: user.email, name: user.name, role: user.role } };
+  });
+
+  // Get stored GitHub token for current user
+  app.get('/api/auth/github-token', {
+    schema: { tags: ['Auth'], description: 'Get stored GitHub access token for current user' },
+  }, async (request, reply) => {
+    const user = request.user as { id: string };
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { githubToken: true, githubId: true } });
+    if (!dbUser) return reply.status(404).send({ error: 'User not found' });
+    return { githubToken: dbUser.githubToken || null, connected: !!dbUser.githubId };
+  });
+
+  // Get GitHub OAuth URL for connecting (with repo scope)
+  app.get('/api/auth/github-connect-url', {
+    schema: { tags: ['Auth'], description: 'Get GitHub OAuth URL for connecting account' },
+  }, async () => {
+    const clientId = config.github.clientId;
+    if (!clientId) return { url: '' };
+    const redirectUri = `${config.frontendUrl}/auth/github-callback`;
+    const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    return { url };
+  });
+
+  // Handle GitHub OAuth callback for connecting (stores token)
+  app.post('/api/auth/github-connect', {
+    schema: { tags: ['Auth'], description: 'Connect GitHub account - stores access token for private repo access' },
+  }, async (request, reply) => {
+    const currentUser = request.user as { id: string };
+    const { code } = request.body as { code: string };
+    if (!code) return reply.status(400).send({ error: 'GitHub code required' });
+
+    const { clientId, clientSecret } = config.github;
+    if (!clientId || !clientSecret) {
+      return reply.status(500).send({ error: 'GitHub OAuth not configured' });
+    }
+
+    let tokenResponse: any;
+    try {
+      const res = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+      });
+      tokenResponse = await res.json();
+    } catch (e: any) {
+      return reply.status(502).send({ error: 'Failed to contact GitHub' });
+    }
+
+    const accessToken = tokenResponse.access_token;
+    if (!accessToken) {
+      return reply.status(401).send({ error: tokenResponse.error_description || 'Invalid code' });
+    }
+
+    // Store the token for the current user
+    await prisma.user.update({
+      where: { id: currentUser.id },
+      data: { githubToken: accessToken },
+    });
+
+    return { success: true, connected: true };
   });
 }

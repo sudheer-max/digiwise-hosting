@@ -18,11 +18,10 @@ interface DeployProgressProps {
   env?: Record<string, string>;
   buildCommand?: string;
   startCommand?: string;
-  githubToken?: string;
 }
 
 export default function DeployProgressView({
-  projectId, appName, repoURL, branch, port, env, buildCommand, startCommand, githubToken
+  projectId, appName, repoURL, branch, port, env, buildCommand, startCommand
 }: DeployProgressProps) {
   const { navigate } = useConsole();
   const [phase, setPhase] = useState<DeployPhase>('starting');
@@ -97,7 +96,6 @@ export default function DeployProgressView({
         startCommand: startCommand || undefined,
         port,
         ...(env && Object.keys(env).length > 0 ? { env } : {}),
-        ...(githubToken ? { githubToken } : {}),
       });
 
       const bn = res?.buildName || '';
@@ -117,7 +115,7 @@ export default function DeployProgressView({
       }
       setPhase('failed');
     }
-  }, [projectId, appName, repoURL, branch, port, env, buildCommand, startCommand, githubToken]);
+  }, [projectId, appName, repoURL, branch, port, env, buildCommand, startCommand]);
 
   useEffect(() => {
     startDeploy();

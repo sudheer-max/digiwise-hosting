@@ -463,6 +463,13 @@ export async function appRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found' });
     }
 
+    // Auto-use stored GitHub token if not provided
+    let token = githubToken;
+    if (!token) {
+      const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { githubToken: true } });
+      token = dbUser?.githubToken || undefined;
+    }
+
     try {
       // Create Kaniko build job (clones repo via alpine/git, builds via kaniko)
       const build = await createBuildJob({
@@ -474,7 +481,7 @@ export async function appRoutes(app: FastifyInstance) {
         startCommand,
         port,
         env,
-        githubToken: githubToken || undefined,
+        githubToken: token,
       });
 
       // Save deployment config for webhook auto-deploy immediately

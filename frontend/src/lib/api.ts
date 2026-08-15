@@ -465,6 +465,32 @@ class ApiClient {
     return this.emailRequest('/email/sent');
   }
 
+  getEmailConfig() {
+    return this.emailRequest('/email/config');
+  }
+
+  saveEmailConfig(data: { email: string; password: string; host: string; port: number; secure: boolean; fromName?: string }) {
+    return this.emailRequest('/email/config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  testEmail() {
+    return this.emailRequest('/email/config/test', { method: 'POST' });
+  }
+
+  deleteEmailConfig() {
+    return this.emailRequest('/email/config', { method: 'DELETE' });
+  }
+
+  markEmailRead(id: string, read: boolean) {
+    return this.emailRequest(`/email/messages/${id}/read`, {
+      method: 'PUT',
+      body: JSON.stringify({ read }),
+    });
+  }
+
   getEmailMessage(id: string) {
     return this.emailRequest(`/email/messages/${id}`);
   }
@@ -605,6 +631,21 @@ class ApiClient {
   }
 
   // === GITHUB DEPLOY ===
+
+  getGitHubToken() {
+    return this.request('/auth/github-token');
+  }
+
+  getGitHubConnectUrl() {
+    return this.request('/auth/github-connect-url');
+  }
+
+  connectGitHub(code: string) {
+    return this.request('/auth/github-connect', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
 
   deployFromGitHub(projectId: string, input: { name: string; repoURL: string; branch?: string; buildCommand?: string; startCommand?: string; port: number; env?: Record<string, string>; githubToken?: string }) {
     return this.request(`/projects/${projectId}/apps/deploy-github`, {

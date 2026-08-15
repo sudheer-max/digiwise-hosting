@@ -61,7 +61,8 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
   const [branch, setBranch] = useState('main');
   const [buildCommand, setBuildCommand] = useState('');
   const [startCommand, setStartCommand] = useState('');
-  const [githubToken, setGithubToken] = useState('');
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
 
   // Step 3: config — database
   const [dbType, setDbType] = useState<string>('postgresql');
@@ -79,6 +80,11 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
     api.listProjects().then((res: any) => {
       const list = Array.isArray(res) ? res : res?.projects || [];
       setProjects(list);
+    }).catch(() => {});
+
+    // Check GitHub connection
+    api.getGitHubToken().then((res: any) => {
+      setGithubConnected(!!res?.connected);
     }).catch(() => {});
   }, []);
 
@@ -221,7 +227,6 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
               : {}),
             ...(buildCommand.trim() ? { buildCommand: buildCommand.trim() } : {}),
             ...(startCommand.trim() ? { startCommand: startCommand.trim() } : {}),
-            ...(githubToken.trim() ? { githubToken: githubToken.trim() } : {}),
           });
         } else {
           // Fallback: call API directly (shouldn't happen inside ConsoleShell)
@@ -618,15 +623,37 @@ export default function CreateApplicationWizard({ onClose, onCreated, projectId:
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">GitHub Token (for private repos)</label>
-                <input
-                  type="password"
-                  value={githubToken}
-                  onChange={(e) => setGithubToken(e.target.value)}
-                  placeholder="ghp_xxxxxxxxxxxx (leave empty for public repos)"
-                  className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-[#00459c]"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">Required for private repos. Create at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" className="underline">github.com/settings/tokens</a> with <strong>repo</strong> scope.</p>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">GitHub Access</label>
+                {githubConnected ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                    <Check className="w-4 h-4" /> GitHub Connected — private repos accessible
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setGithubLoading(true);
+                      try {
+                        const res: any = await api.getGitHubConnectUrl();
+                        if (res?.url) {
+                          // Store current URL to return to after OAuth
+                          localStorage.setItem('github_connect_return', window.location.href);
+                          window.location.href = res.url;
+                        }
+                      } catch {
+                        // Fallback: open GitHub OAuth directly
+                        window.open('https://github.com/login/oauth/authorize?client_id=' + (window as any).__GITHUB_CLIENT_ID__ + '&scope=repo', '_blank');
+                      }
+                      setGithubLoading(false);
+                    }}
+                    disabled={githubLoading}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {githubLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Github className="w-4 h-4" />}
+                    {githubLoading ? 'Connecting...' : 'Connect GitHub Account'}
+                  </button>
+                )}
+                <p className="text-[10px] text-slate-400 mt-1">Required for private repos. Click to authorize with GitHub.</p>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
