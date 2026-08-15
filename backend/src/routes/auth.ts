@@ -323,8 +323,8 @@ export async function authRoutes(app: FastifyInstance) {
   }, async () => {
     const clientId = config.github.clientId;
     if (!clientId) return { url: '' };
-    const redirectUri = `${config.frontendUrl}/auth/github-callback`;
-    const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const redirectUri = `${config.frontendUrl}/auth/github/callback`;
+    const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&redirect_uri=${encodeURIComponent(redirectUri)}&state=connect`;
     return { url };
   });
 

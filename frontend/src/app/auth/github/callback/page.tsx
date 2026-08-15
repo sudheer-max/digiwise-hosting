@@ -15,6 +15,7 @@ function CallbackHandler() {
   useEffect(() => {
     const code = searchParams.get('code');
     const error = searchParams.get('error');
+    const state = searchParams.get('state');
 
     if (error) {
       setStatus('error');
@@ -25,6 +26,34 @@ function CallbackHandler() {
     if (!code) {
       setStatus('error');
       setMessage('No authorization code received from GitHub.');
+      return;
+    }
+
+    if (state === 'connect') {
+      // Connect flow: exchange code for token and store it
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.digiwisesoftech.com';
+      fetch(`${apiUrl}/api/auth/github-connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ code }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          setStatus('success');
+          setMessage('GitHub account connected! Private repos are now accessible.');
+          // Return to the page that initiated the connect
+          const returnUrl = localStorage.getItem('github_connect_return') || '/console';
+          localStorage.removeItem('github_connect_return');
+          setTimeout(() => router.push(returnUrl), 1500);
+        })
+        .catch((err: any) => {
+          setStatus('error');
+          setMessage(err.message || 'Failed to connect GitHub account.');
+        });
       return;
     }
 
